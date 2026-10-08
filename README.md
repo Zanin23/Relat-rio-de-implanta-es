@@ -21,33 +21,20 @@ Depois acesse `http://localhost:8080`.
 
 ## Publicar na Vercel via repositório Git
 
-### 1. Criar o repositório
+Repositório: https://github.com/Zanin23/Relat-rio-de-implanta-es
 
-No GitHub: **New repository** -> nome `implantacoes-dashboard` -> **Create repository**.
-Não marque "Add a README" (o arquivo já existe aqui).
-
-### 2. Enviar o código
-
-```bash
-cd site
-git init -b main
-git add .
-git commit -m "Dashboard de status de implantações"
-git remote add origin https://github.com/SEU-USUARIO/implantacoes-dashboard.git
-git push -u origin main
-```
-
-### 3. Importar na Vercel
+### 1. Importar na Vercel
 
 1. Acesse https://vercel.com/new
-2. Autorize o acesso ao GitHub e selecione `implantacoes-dashboard`
+2. Autorize o acesso ao GitHub e selecione `Relat-rio-de-implanta-es`
 3. Configure:
    - **Framework Preset:** Other
    - **Build Command:** vazio
    - **Output Directory:** vazio
 4. Clique em **Deploy**
 
-Em ~10 segundos o site fica em `https://implantacoes-dashboard.vercel.app`.
+Em ~10 segundos o site fica em `https://relat-rio-de-implanta-es.vercel.app`
+(o nome do domínio pode ser alterado depois em Settings -> Domains).
 
 ## Atualizar depois de publicado
 
