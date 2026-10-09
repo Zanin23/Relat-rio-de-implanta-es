@@ -1,695 +1,480 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Status de Implantações — 08/10/2026</title>
+<title>Relatório de Implantações</title>
+<link rel="icon" href="data:,">
 <style>
+/* ============================================================
+   TEMA
+   ============================================================ */
 :root{
-  --bg:#070b16; --bg2:#0b1224; --panel:#0f1729; --panel2:#131d36; --line:rgba(148,163,184,.16);
-  --txt:#e8edf7; --muted:#8d9ab4; --brand:#4f8cff; --brand2:#7c5cff;
-  --ok:#2dd4a7; --wait:#f5a524; --dev:#8b5cf6; --run:#4f8cff; --risk:#f4526b;
-  --radius:16px;
+  --bg:#fbfbfc; --surface:#ffffff; --surface2:#f6f6f7;
+  --line:#e7e7ea; --line2:#d6d6db;
+  --txt:#19191d; --muted:#74747d; --faint:#a1a1aa;
+  --accent:#4f46e5; --accent-soft:#eef0fe;
+  --ok:#15803d; --wait:#b45309; --dev:#6d28d9; --run:#1d4ed8; --risk:#b91c1c;
+  --radius:10px;
+  --shadow:0 18px 46px rgba(15,15,25,.14);
 }
-*{box-sizing:border-box}
+html[data-theme="dark"]{
+  --bg:#0c0c0f; --surface:#141418; --surface2:#1b1b20;
+  --line:#26262c; --line2:#35353d;
+  --txt:#f3f3f5; --muted:#a0a0a9; --faint:#75757e;
+  --accent:#8b8cf9; --accent-soft:#1c1b38;
+  --ok:#4ade80; --wait:#fbbf24; --dev:#a78bfa; --run:#60a5fa; --risk:#f87171;
+  --shadow:0 18px 46px rgba(0,0,0,.5);
+}
+*,*::before,*::after{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  background:
-    radial-gradient(1100px 620px at 8% -10%, rgba(79,140,255,.22), transparent 60%),
-    radial-gradient(900px 520px at 96% 0%, rgba(124,92,255,.18), transparent 60%),
-    radial-gradient(700px 500px at 50% 110%, rgba(45,212,167,.10), transparent 60%),
-    var(--bg);
-  color:var(--txt);
-  font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--txt);
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   -webkit-font-smoothing:antialiased;
 }
-.wrap{max-width:1460px;margin:0 auto;padding:22px 26px 60px}
+::selection{background:var(--accent-soft)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
-/* ---------- header ---------- */
-.top{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;flex-wrap:wrap}
-.brand h1{margin:0;font-size:26px;letter-spacing:-.4px}
-.brand p{margin:6px 0 0;color:var(--muted);font-size:13.5px}
-.dot-date{display:inline-flex;align-items:center;gap:8px;background:rgba(45,212,167,.10);
-  border:1px solid rgba(45,212,167,.30);color:#8ff0d4;padding:5px 11px;border-radius:999px;font-size:12.5px;font-weight:600;margin-bottom:10px}
-.dot-date i{width:7px;height:7px;border-radius:50%;background:var(--ok);display:inline-block;box-shadow:0 0 0 4px rgba(45,212,167,.18)}
-.tools{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.wrap{max-width:1160px;margin:0 auto;padding:38px 22px 80px}
+section{margin-bottom:26px}
+.sec-title{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 12px}
+
+/* ---------- topo ---------- */
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:26px}
+.eyebrow{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:7px}
+.eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none}
+h1{margin:0;font-size:23px;font-weight:650;letter-spacing:-.4px}
+.lede{margin:6px 0 0;font-size:13.5px;color:var(--muted);max-width:62ch}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* data do levantamento editável inline */
+.date-inline{background:transparent;border:0;border-bottom:1px dashed var(--line2);color:var(--muted);
+  font:inherit;font-size:12.5px;padding:0 0 1px;width:132px;border-radius:0;cursor:pointer}
+.date-inline:hover{color:var(--txt);border-bottom-color:var(--accent)}
+
+/* ---------- botões ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 12px;
+  border:1px solid var(--line);background:var(--surface);color:var(--txt);border-radius:8px;
+  font:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap;transition:.14s}
+.btn:hover{border-color:var(--line2);background:var(--surface2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.08);background:var(--accent)}
+.btn.icon{width:34px;padding:0;color:var(--muted);font-size:15px}
+.btn.icon:hover{color:var(--txt)}
+.btn.sm{height:29px;padding:0 9px;font-size:12.5px}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--surface2);color:var(--txt);border-color:transparent}
+.btn.danger{color:var(--risk)}
+.btn.danger:hover{border-color:var(--risk);background:color-mix(in srgb,var(--risk) 8%,transparent)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+
+/* ---------- busca ---------- */
 .search{position:relative}
-.search input{background:var(--panel);border:1px solid var(--line);color:var(--txt);
-  padding:10px 12px 10px 34px;border-radius:12px;font-size:13.5px;width:250px;outline:none}
-.search input:focus{border-color:rgba(79,140,255,.6);box-shadow:0 0 0 3px rgba(79,140,255,.14)}
-.search svg{position:absolute;left:11px;top:9px;opacity:.55}
-.btn{background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:10px 14px;border-radius:12px;
-  font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
-.btn:hover{background:var(--panel2);border-color:rgba(79,140,255,.45);transform:translateY(-1px)}
-.btn.primary{background:linear-gradient(135deg,var(--brand),var(--brand2));border-color:transparent;color:#fff}
-.btn.primary:hover{filter:brightness(1.08)}
+.search input{height:34px;padding:0 10px 0 31px;width:216px;font-size:13px}
+.search svg{position:absolute;left:9px;top:9px;color:var(--faint);pointer-events:none}
 
-/* ---------- kpis ---------- */
-.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin:24px 0 18px}
-.kpi{background:linear-gradient(180deg,rgba(19,29,54,.9),rgba(15,23,41,.9));border:1px solid var(--line);
-  border-radius:var(--radius);padding:15px 16px;position:relative;overflow:hidden}
-.kpi:before{content:"";position:absolute;inset:0;background:radial-gradient(120px 60px at 90% 0%,var(--accent),transparent 70%);opacity:.20}
-.kpi .v{font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1}
-.kpi .l{color:var(--muted);font-size:11.5px;margin-top:7px;text-transform:uppercase;letter-spacing:.7px}
-.kpi .s{color:var(--txt);font-size:11.5px;margin-top:4px;opacity:.75}
+/* ---------- menu "Dados" ---------- */
+.menu{position:relative}
+.menu-pop{display:none;position:absolute;right:0;top:calc(100% + 6px);min-width:236px;z-index:30;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:5px;box-shadow:var(--shadow)}
+.menu.open .menu-pop{display:block}
+.menu-pop button{display:flex;width:100%;align-items:center;gap:9px;background:none;border:0;color:var(--txt);
+  font:inherit;font-size:13px;text-align:left;padding:8px 9px;border-radius:7px;cursor:pointer}
+.menu-pop button:hover{background:var(--surface2)}
+.menu-pop button small{display:block;color:var(--muted);font-size:11.5px;margin-top:1px}
+.menu-pop hr{border:0;border-top:1px solid var(--line);margin:5px 0}
 
-/* ---------- panels ---------- */
-.grid2{display:grid;grid-template-columns:1.05fr .95fr;gap:16px;margin-bottom:16px}
-.card{background:linear-gradient(180deg,rgba(19,29,54,.78),rgba(15,23,41,.78));border:1px solid var(--line);
-  border-radius:var(--radius);padding:18px}
-.card h2{margin:0 0 3px;font-size:15px;letter-spacing:-.2px}
-.card .sub{color:var(--muted);font-size:12.5px;margin:0 0 14px}
-.bar-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;font-size:12.5px;cursor:pointer}
-.bar-row:hover .bar-label{color:var(--txt)}
-.bar-label{width:190px;color:var(--muted);flex:none}
-.bar-track{flex:1;height:11px;background:rgba(148,163,184,.13);border-radius:99px;overflow:hidden}
-.bar-fill{height:100%;border-radius:99px;transition:width .9s cubic-bezier(.2,.8,.2,1)}
-.bar-val{width:30px;text-align:right;font-weight:700;font-size:12px;flex:none}
+/* ============================================================
+   INPUTS
+   ============================================================ */
+input[type=text],input[type=date],input[type=number],select,textarea{
+  width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;
+  padding:8px 10px;font:inherit;font-size:13.5px;color:var(--txt)}
+input::placeholder,textarea::placeholder{color:var(--faint)}
+input:hover,select:hover,textarea:hover{border-color:var(--line2)}
+input[type=range]{width:100%;accent-color:var(--accent);padding:0;border:0;background:none}
+label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0 0 5px}
+.hint{font-size:11.5px;color:var(--faint);margin:5px 0 0}
+.select{width:auto;background:var(--surface);border:1px solid var(--line);border-radius:99px;
+  padding:6px 10px;font:inherit;font-size:12.5px;color:var(--muted);cursor:pointer}
+.select:hover{border-color:var(--line2);color:var(--txt)}
 
-.matrix{display:grid;grid-template-columns:170px repeat(5,1fr);gap:6px;font-size:11.5px}
-.mx-head{color:var(--muted);text-align:center;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;padding-bottom:4px}
-.mx-name{display:flex;align-items:center;gap:6px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
-.cell{height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:10.5px;
-  background:rgba(148,163,184,.10);color:rgba(148,163,184,.6)}
-.cell.done{background:rgba(45,212,167,.16);color:#7ff0d0;border:1px solid rgba(45,212,167,.30)}
-.cell.now{background:rgba(79,140,255,.20);color:#a9c8ff;border:1px solid rgba(79,140,255,.40)}
-.cell.pend{background:rgba(245,165,36,.13);color:#ffd08a;border:1px solid rgba(245,165,36,.26)}
-.cell.na{background:rgba(148,163,184,.05);color:rgba(148,163,184,.35)}
+/* ============================================================
+   KPIs
+   ============================================================ */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));
+  border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
+.kpi{padding:13px 15px;border-right:1px solid var(--line)}
+.kpi:last-child{border-right:0}
+.kpi .v{font-size:23px;font-weight:650;letter-spacing:-.6px;line-height:1.1}
+.kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:3px}
 
-/* ---------- filters ---------- */
-.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 16px}
-.chip{padding:8px 13px;border-radius:999px;border:1px solid var(--line);background:rgba(15,23,41,.7);
-  color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer;transition:.15s;user-select:none}
-.chip:hover{color:var(--txt);border-color:rgba(79,140,255,.4)}
-.chip.on{background:linear-gradient(135deg,rgba(79,140,255,.9),rgba(124,92,255,.9));color:#fff;border-color:transparent}
-.chip .n{opacity:.75;font-weight:800;margin-left:5px}
-.sep{width:1px;height:22px;background:var(--line);margin:0 4px}
-.select{background:var(--panel);border:1px solid var(--line);color:var(--txt);padding:8px 10px;border-radius:10px;font-size:12.5px}
+/* ============================================================
+   CARDS DE CONTEÚDO
+   ============================================================ */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:17px 18px}
+.card h2{margin:0;font-size:13px;font-weight:650;letter-spacing:-.1px}
+.card .sub{margin:3px 0 15px;font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
-/* ---------- company cards ---------- */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
-.co{background:linear-gradient(180deg,rgba(19,29,54,.92),rgba(14,22,40,.92));border:1px solid var(--line);
-  border-radius:var(--radius);padding:16px;cursor:pointer;transition:.18s;position:relative;overflow:hidden}
-.co:hover{transform:translateY(-3px);border-color:rgba(79,140,255,.45);box-shadow:0 14px 34px rgba(2,6,23,.55)}
-.co:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
+/* barras */
+.bar-row{display:flex;align-items:center;gap:11px;margin-bottom:9px;font-size:12.5px}
+.bar-row:last-child{margin-bottom:0}
+.bar-row.clickable{cursor:pointer;padding:3px 4px;margin:-3px -4px;border-radius:7px}
+.bar-row.clickable:hover{background:var(--surface2)}
+.bar-label{width:172px;flex:none;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-track{flex:1;height:7px;background:var(--surface2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.bar-fill{height:100%;border-radius:99px}
+.bar-val{width:44px;text-align:right;font-weight:650;font-size:12px;flex:none;font-variant-numeric:tabular-nums}
+
+/* matriz de fases */
+.matrix{display:grid;grid-template-columns:168px repeat(5,1fr);gap:5px;font-size:11.5px;min-width:640px}
+.mx-head{color:var(--muted);text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.05em;padding-bottom:5px}
+.mx-name{display:flex;align-items:center;gap:7px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.cell{height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:10.5px;background:var(--surface2);color:var(--faint);border:1px solid transparent}
+.cell.done{background:color-mix(in srgb,var(--ok) 12%,transparent);color:var(--ok);border-color:color-mix(in srgb,var(--ok) 28%,transparent)}
+.cell.now{background:color-mix(in srgb,var(--run) 12%,transparent);color:var(--run);border-color:color-mix(in srgb,var(--run) 28%,transparent)}
+.cell.pend{background:color-mix(in srgb,var(--wait) 12%,transparent);color:var(--wait);border-color:color-mix(in srgb,var(--wait) 28%,transparent)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:13px}
+.legend i{font-style:normal;font-weight:700;margin-right:5px}
+
+/* ============================================================
+   FILTROS
+   ============================================================ */
+.filters{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+.chip{padding:6px 11px;border-radius:99px;border:1px solid var(--line);background:var(--surface);
+  color:var(--muted);font-size:12.5px;font-weight:500;cursor:pointer;transition:.14s;user-select:none}
+.chip:hover{color:var(--txt);border-color:var(--line2)}
+.chip.on{background:var(--txt);border-color:var(--txt);color:var(--surface)}
+html[data-theme="dark"] .chip.on{background:var(--txt);color:#0c0c0f}
+.chip .n{opacity:.6;font-weight:700;margin-left:4px;font-variant-numeric:tabular-nums}
+.sep{width:1px;height:20px;background:var(--line);margin:0 3px}
+
+/* ============================================================
+   CARDS DE EMPRESA
+   ============================================================ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(292px,1fr));gap:12px}
+.co{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 15px 13px;cursor:pointer;transition:border-color .14s,background .14s}
+.co:hover{border-color:var(--line2);background:color-mix(in srgb,var(--accent) 3%,var(--surface))}
 .co .hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-.co h3{margin:0;font-size:16.5px;letter-spacing:-.3px}
-.co .type{color:var(--muted);font-size:11.5px;margin-top:3px;text-transform:uppercase;letter-spacing:.6px}
-.pill{font-size:10.5px;font-weight:800;padding:5px 9px;border-radius:999px;white-space:nowrap;letter-spacing:.3px}
-.co .prog{margin:14px 0 8px}
-.co .prog .top-line{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:6px}
-.co .prog .top-line b{color:var(--txt);font-size:13px}
-.track{height:8px;background:rgba(148,163,184,.14);border-radius:99px;overflow:hidden}
-.track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--brand),var(--ok));transition:width 1s cubic-bezier(.2,.8,.2,1)}
-.co .st{font-size:12.5px;color:#c6d2e8;line-height:1.5;margin:12px 0 0;padding:11px 12px;background:rgba(148,163,184,.07);
-  border-left:2px solid var(--accent);border-radius:0 9px 9px 0}
-.co .meta{display:flex;gap:14px;margin-top:12px;font-size:11.5px;color:var(--muted);flex-wrap:wrap}
-.co .meta b{color:var(--txt)}
-.empty{color:var(--muted);text-align:center;padding:46px;font-size:14px}
+.co h3{margin:0;font-size:15px;font-weight:650;letter-spacing:-.2px;display:flex;align-items:center;gap:7px}
+.co h3 .dot{width:7px;height:7px;border-radius:50%;background:var(--c);flex:none}
+.co .type{font-size:11.5px;color:var(--muted);margin-top:2px}
+.co .edit{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:7px;border:1px solid transparent;
+  background:transparent;color:var(--faint);cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:.14s}
+.co:hover .edit,.co:focus-within .edit{opacity:1}
+@media (hover:none){.co .edit{opacity:.75}}
+.co .edit:hover{border-color:var(--line);background:var(--surface);color:var(--txt)}
+.pill{font-size:10.5px;font-weight:650;padding:3px 8px;border-radius:99px;white-space:nowrap;
+  color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 25%,transparent)}
+.co .prog{margin:13px 0 10px}
+.co .prog .tl{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-bottom:5px}
+.co .prog .tl b{color:var(--txt);font-size:12.5px;font-variant-numeric:tabular-nums}
+.track{height:5px;background:var(--surface2);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.track i{display:block;height:100%;border-radius:99px;background:var(--c)}
+.co .st{font-size:12.5px;color:var(--muted);line-height:1.5;margin:0;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.co .meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:11px;border-top:1px solid var(--line);
+  font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.co .meta b{color:var(--txt);font-weight:650}
+.empty{border:1px dashed var(--line2);border-radius:var(--radius);padding:44px 20px;text-align:center;color:var(--muted);font-size:13.5px}
+.empty button{margin-top:12px}
+.footer{color:var(--faint);font-size:11.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:30px}
+.footer .save{color:var(--ok)}
 
-/* ---------- modal ---------- */
-.backdrop{position:fixed;inset:0;background:rgba(3,7,18,.82);backdrop-filter:blur(6px);display:none;z-index:50;padding:24px;overflow:auto}
+/* ============================================================
+   MODAIS
+   ============================================================ */
+.backdrop{position:fixed;inset:0;background:rgba(20,20,28,.42);backdrop-filter:blur(3px);
+  display:none;z-index:50;padding:22px;overflow:auto}
+html[data-theme="dark"] .backdrop{background:rgba(0,0,0,.6)}
 .backdrop.on{display:flex;align-items:flex-start;justify-content:center}
-.modal{background:linear-gradient(180deg,#131d36,#0d1425);border:1px solid rgba(148,163,184,.22);border-radius:20px;
-  max-width:940px;width:100%;padding:26px;position:relative;margin:auto;box-shadow:0 30px 80px rgba(0,0,0,.6)}
-.modal h2{margin:0;font-size:24px;letter-spacing:-.5px}
-.modal .subline{color:var(--muted);font-size:13px;margin-top:5px}
-.x{position:absolute;top:16px;right:16px;width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
-  background:rgba(148,163,184,.08);color:var(--txt);cursor:pointer;font-size:17px;line-height:1}
-.x:hover{background:rgba(244,82,107,.2)}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:20px}
-.box{background:rgba(148,163,184,.06);border:1px solid var(--line);border-radius:14px;padding:15px}
-.box h4{margin:0 0 11px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);
+  width:100%;max-width:780px;margin:auto;position:relative}
+.modal .body{padding:22px 24px 20px}
+.x{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:8px;border:1px solid transparent;
+  background:transparent;color:var(--muted);font-size:19px;line-height:1;cursor:pointer}
+.x:hover{background:var(--surface2);color:var(--txt)}
+.modal h2{margin:0;font-size:19px;font-weight:650;letter-spacing:-.3px}
+.subline{color:var(--muted);font-size:12.5px;margin-top:3px}
+.modal .foot{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:13px 24px;border-top:1px solid var(--line);flex-wrap:wrap}
+.modal .foot .hint{color:var(--faint);font-size:11.5px;margin:0}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.box h4{margin:0 0 9px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:650}
 ul.list{margin:0;padding:0;list-style:none}
-ul.list li{font-size:13px;padding:6px 0 6px 22px;position:relative;color:#dbe4f5;line-height:1.45;border-bottom:1px solid rgba(148,163,184,.07)}
+ul.list li{position:relative;font-size:13px;line-height:1.5;padding:5px 0 5px 17px;color:var(--txt);
+  border-bottom:1px solid var(--line)}
 ul.list li:last-child{border-bottom:0}
-ul.list li:before{content:"";position:absolute;left:2px;top:11px;width:8px;height:8px;border-radius:50%;background:var(--ok)}
-ul.list.pend li:before{background:var(--wait)}
-ul.list.sub li:before{background:var(--dev)}
-ul.list.sub li{color:#c9bdfc}
-.statusbox{grid-column:1/-1;background:rgba(79,140,255,.08);border:1px solid rgba(79,140,255,.25);border-radius:14px;padding:15px}
-.statusbox p{margin:0;font-size:14px;line-height:1.6}
-.pipeline{display:flex;gap:8px;margin-top:18px;flex-wrap:wrap}
-.step{flex:1;min-width:120px;border-radius:11px;padding:11px 12px;font-size:11.5px;font-weight:700;border:1px solid transparent}
-.step small{display:block;font-weight:500;opacity:.72;margin-top:3px;font-size:10.5px}
-.step.done{background:rgba(45,212,167,.12);border-color:rgba(45,212,167,.3);color:#8ff0d4}
-.step.now{background:rgba(79,140,255,.16);border-color:rgba(79,140,255,.42);color:#b7d0ff}
-.step.pend{background:rgba(245,165,36,.10);border-color:rgba(245,165,36,.28);color:#ffd294}
-.step.na{background:rgba(148,163,184,.06);color:rgba(148,163,184,.5)}
-.navm{display:flex;gap:9px;justify-content:space-between;margin-top:20px;align-items:center}
-.hint{color:var(--muted);font-size:11.5px}
+ul.list li::before{content:"";position:absolute;left:1px;top:12px;width:6px;height:6px;border-radius:50%;background:var(--ok)}
+ul.list.pend li::before{background:var(--wait)}
+ul.list.grupo li::before{background:var(--dev)}
+.none{font-size:12.5px;color:var(--faint);font-style:italic}
+.statusbox{margin-top:16px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:13px 14px}
+.statusbox h4{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:650}
+.statusbox p{margin:0;font-size:13.5px;line-height:1.55}
+.statusbox .obs{margin-top:9px;font-size:12.5px;color:var(--muted)}
+.pipeline{display:flex;gap:6px;margin-top:16px;flex-wrap:wrap}
+.step{flex:1;min-width:104px;border-radius:8px;padding:8px 10px;font-size:11.5px;font-weight:600;
+  border:1px solid var(--line);background:var(--surface2);color:var(--faint)}
+.step small{display:block;font-weight:400;margin-top:2px;font-size:10.5px;opacity:.85;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.step.done{background:color-mix(in srgb,var(--ok) 10%,transparent);border-color:color-mix(in srgb,var(--ok) 26%,transparent);color:var(--ok)}
+.step.now{background:color-mix(in srgb,var(--run) 10%,transparent);border-color:color-mix(in srgb,var(--run) 26%,transparent);color:var(--run)}
+.step.pend{background:color-mix(in srgb,var(--wait) 10%,transparent);border-color:color-mix(in srgb,var(--wait) 26%,transparent);color:var(--wait)}
+.hist{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}
+.hist ol{margin:0;padding:0;list-style:none}
+.hist li{display:flex;gap:10px;align-items:baseline;font-size:12.5px;padding:4px 0;color:var(--muted)}
+.hist li time{color:var(--faint);font-variant-numeric:tabular-nums;flex:none;width:74px}
+.hist li b{color:var(--txt);font-weight:600}
 
-/* ---------- focus / apresentacao ---------- */
+/* ---------- formulário (editor) ---------- */
+.form{padding:22px 24px 4px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fgrid .full{grid-column:1/-1}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{display:flex;gap:6px;align-items:center}
+.row input{flex:1}
+.row .mini{width:28px;height:28px;flex:none;border:1px solid var(--line);background:var(--surface);
+  color:var(--muted);border-radius:7px;cursor:pointer;font-size:15px;line-height:1}
+.row .mini:hover{color:var(--risk);border-color:var(--risk)}
+details.phases{margin-top:6px;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+details.phases summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted)}
+details.phases summary:hover{color:var(--txt)}
+.prow{display:grid;grid-template-columns:150px 132px 1fr;gap:8px;align-items:center;margin-top:9px}
+.prow span{font-size:12.5px;color:var(--muted)}
+.prow select,.prow input{padding:6px 8px;font-size:12.5px}
+
+/* ---------- toast ---------- */
+#toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:90;
+  background:var(--txt);color:var(--surface);font-size:13px;padding:9px 15px;border-radius:99px;
+  box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:.22s}
+html[data-theme="dark"] #toast{background:var(--txt);color:#0c0c0f}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+/* ============================================================
+   MODO APRESENTAÇÃO
+   ============================================================ */
+.stage{display:none;min-height:100vh;padding:30px 34px}
 body.focus .wrap>*:not(.stage){display:none}
 body.focus .wrap{padding:0;max-width:none}
-.stage{display:none;min-height:100vh;padding:34px 40px}
 body.focus .stage{display:block}
-.stage .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
-.stage .big{background:linear-gradient(180deg,rgba(19,29,54,.95),rgba(13,20,37,.95));border:1px solid var(--line);
-  border-radius:22px;padding:34px 38px}
-.stage h2{font-size:38px;margin:0;letter-spacing:-1px}
-.stage .prog-big{height:16px;background:rgba(148,163,184,.14);border-radius:99px;overflow:hidden;margin:20px 0 8px}
-.stage .prog-big i{display:block;height:100%;background:linear-gradient(90deg,var(--brand),var(--ok));transition:width .6s}
-.stage .cols{margin-top:26px;grid-template-columns:1.15fr .85fr}
-.stage ul.list li{font-size:15.5px;padding:8px 0 8px 26px}
-.stage ul.list li:before{top:15px}
-.stage .statusbox p{font-size:18px}
-.stage .step{min-width:150px;font-size:13px}
-.footer{margin-top:28px;color:var(--muted);font-size:11.5px;text-align:center}
-@media (max-width:1080px){.kpis{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}.cols{grid-template-columns:1fr}}
-@media (max-width:640px){.kpis{grid-template-columns:repeat(2,1fr)}.wrap{padding:16px}.matrix{grid-template-columns:120px repeat(5,1fr);font-size:10px}}
+.stage .sh{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+.stage .big{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--c);
+  border-radius:14px;padding:30px 34px}
+.stage h2{font-size:30px;letter-spacing:-.7px}
+.stage .pct{font-size:44px;font-weight:700;letter-spacing:-2px;color:var(--c);font-variant-numeric:tabular-nums}
+.stage .prog-big{height:9px;background:var(--surface2);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin:18px 0 4px}
+.stage .prog-big i{display:block;height:100%;background:var(--c)}
+.stage ul.list li{font-size:14.5px}
+.stage .statusbox p{font-size:16px}
+
+/* ============================================================
+   RESPONSIVO / IMPRESSÃO
+   ============================================================ */
+@media (max-width:900px){
+  .grid2{grid-template-columns:1fr}
+  .cols{grid-template-columns:1fr}
+  .fgrid{grid-template-columns:1fr}
+  .search input{width:150px}
+}
+@media (max-width:620px){
+  .wrap{padding:24px 14px 60px}
+  .kpi{border-right:0;border-bottom:1px solid var(--line)}
+  .prow{grid-template-columns:1fr;gap:4px}
+  .stage .big{padding:20px}
+}
 @media print{
-  body{background:#fff;color:#111}
-  .tools,.filters,.footer,.stage{display:none!important}
-  .card,.co,.kpi{background:#fff!important;border:1px solid #ddd!important;break-inside:avoid;box-shadow:none!important}
-  .grid{grid-template-columns:repeat(2,1fr)}
-  .co .st{color:#333}.brand p,.co .type,.card .sub,.kpi .l{color:#555!important}
-  .kpi .v,.co h3{color:#111!important}
+  body{background:#fff}
+  .tools,.filters,.footer,.stage,.co .edit,.menu,.x,.modal .foot,#toast{display:none!important}
+  .card,.co,.kpi,.modal{border-color:#ddd!important;box-shadow:none!important;background:#fff!important}
+  .grid{grid-template-columns:1fr 1fr}
+  .co .st{display:block;-webkit-line-clamp:unset;overflow:visible}
+  .matrix{min-width:0}
+  .bar-track,.track{background:#f1f1f1!important}
+  .co .st,.lede,.sub,.bar-label,.kpi .l{color:#555!important}
 }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <!-- ============ HEADER ============ -->
+  <!-- ==================== TOPO ==================== -->
   <header class="top">
-    <div class="brand">
-      <div class="dot-date"><i></i>Levantamento de 08/10/2026</div>
-      <h1>Status de Implantações Ativas</h1>
-      <p id="subCount">Visão consolidada das carteiras em implantação, reimplantação e migração para o Cloud</p>
+    <div>
+      <div class="eyebrow">
+        <span class="dot"></span>Relatório de implantações · levantamento de
+        <input type="date" class="date-inline" id="dataRel" title="Data do levantamento">
+      </div>
+      <h1>Status das implantações</h1>
+      <p class="lede" id="lede"></p>
     </div>
     <div class="tools">
       <div class="search">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input id="q" type="text" placeholder="Buscar empresa, tarefa ou pendência…">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="text" id="q" placeholder="Buscar empresa, item, pendência…">
       </div>
-      <button class="btn" id="btnPrint">Imprimir / PDF</button>
-      <button class="btn primary" id="btnPresent">Modo Apresentação</button>
+      <button class="btn primary" id="btnNew">+ Nova empresa</button>
+      <div class="menu" id="menu">
+        <button class="btn" id="btnMenu">Dados ▾</button>
+        <div class="menu-pop" id="menuPop">
+          <button id="mExport"><span>⬇︎ Exportar JSON<small>backup com tudo o que está cadastrado</small></span></button>
+          <button id="mExportJs"><span>⬇︎ Baixar dados.js<small>arquivo para commitar e publicar para todos</small></span></button>
+          <button id="mImport"><span>⬆︎ Importar JSON<small>substitui o relatório atual</small></span></button>
+          <hr>
+          <button id="mReset"><span>↺ Restaurar relatório original<small>volta aos dados de 08/10/2026</small></span></button>
+        </div>
+      </div>
+      <button class="btn icon" id="btnTheme" title="Alternar tema claro/escuro">☾</button>
+      <button class="btn" id="btnPrint" title="Imprimir ou salvar em PDF">PDF</button>
+      <button class="btn" id="btnPresent" title="Apresentação em tela cheia">Apresentar</button>
     </div>
   </header>
 
-  <!-- ============ KPIs ============ -->
+  <!-- ==================== KPIs ==================== -->
   <section class="kpis" id="kpis"></section>
 
-  <!-- ============ GRÁFICOS ============ -->
+  <!-- ==================== GRÁFICOS ==================== -->
   <section class="grid2">
     <div class="card">
-      <h2>Status geral das carteiras</h2>
-      <p class="sub">Distribuição por situação atual — clique para filtrar</p>
+      <h2>Status geral</h2>
+      <p class="sub">Distribuição das carteiras por situação — clique para filtrar</p>
       <div id="statusChart"></div>
     </div>
     <div class="card">
       <h2>Por tipo de trabalho</h2>
-      <p class="sub">Natureza do projeto e gargalos identificados</p>
+      <p class="sub">Natureza dos projetos em andamento</p>
       <div id="typeChart"></div>
-      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
-        <h2 style="font-size:13px">Gargalos da carteira</h2>
-        <div id="gargalos" style="margin-top:10px"></div>
-      </div>
+      <p class="hint" id="gargalo" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"></p>
     </div>
   </section>
 
-  <!-- ============ MATRIZ DE FASES ============ -->
-  <section class="card" style="margin-bottom:16px">
-    <h2>Matriz de fases da implantação</h2>
-    <p class="sub">Verde = concluído · Azul = em andamento · Âmbar = pendente/bloqueado · Cinza = não previsto nesta carteira</p>
+  <!-- ==================== MATRIZ ==================== -->
+  <section class="card">
+    <h2>Matriz de fases</h2>
+    <p class="sub">O que já está concluído e o que ainda falta por etapa</p>
     <div style="overflow-x:auto"><div class="matrix" id="matrix"></div></div>
+    <div class="legend">
+      <span><i style="color:var(--ok)">✓</i>concluído</span>
+      <span><i style="color:var(--run)">●</i>em andamento</span>
+      <span><i style="color:var(--wait)">!</i>pendente / bloqueado</span>
+      <span><i style="color:var(--faint)">—</i>não previsto</span>
+    </div>
   </section>
 
-  <!-- ============ FILTROS ============ -->
-  <section class="filters">
-    <div class="chip on" data-status="all">Todas<span class="n" id="nAll"></span></div>
-    <div class="chip" data-status="cliente">Aguardando cliente<span class="n" id="nCli"></span></div>
-    <div class="chip" data-status="desenvolvimento">Aguardando desenvolvimento<span class="n" id="nDev"></span></div>
-    <div class="chip" data-status="andamento">Em andamento<span class="n" id="nRun"></span></div>
-    <div class="chip" data-status="risco">Atenção / Risco<span class="n" id="nRisk"></span></div>
-    <div class="sep"></div>
-    <div class="chip" data-type="all">Todos os tipos</div>
-    <div class="chip" data-type="Nova implantação">Nova implantação</div>
-    <div class="chip" data-type="Reimplantação">Reimplantação</div>
-    <div class="chip" data-type="Migração Cloud">Migração Cloud</div>
-    <div class="chip" data-type="Treinamento">Treinamento</div>
-    <div class="sep"></div>
-    <select class="select" id="sort">
-      <option value="prog-desc">Ordenar: maior progresso</option>
-      <option value="prog-asc">Ordenar: menor progresso</option>
-      <option value="nome">Ordenar: nome (A-Z)</option>
-      <option value="status">Ordenar: status</option>
-      <option value="origem">Ordem original do relatório</option>
-    </select>
+  <!-- ==================== FILTROS ==================== -->
+  <section class="filters" id="filters"></section>
+
+  <!-- ==================== CARDS ==================== -->
+  <section>
+    <div class="grid" id="grid"></div>
+    <div class="empty" id="empty" style="display:none">
+      Nenhuma empresa encontrada com esses filtros.
+      <br><button class="btn sm" id="btnClear" style="margin-top:12px">Limpar filtros</button>
+    </div>
   </section>
 
-  <!-- ============ CARDS ============ -->
-  <section class="grid" id="grid"></section>
-  <div class="empty" id="empty" style="display:none">Nenhuma empresa encontrada com os filtros aplicados.</div>
+  <div class="footer" id="footer"></div>
 
-  <div class="footer">Relatório gerado a partir do levantamento de 08/10/2026 · 14 empresas · Dashboard interativo (arquivo único, funciona offline)</div>
-
-  <!-- ============ ESTÁGIO DE APRESENTAÇÃO ============ -->
+  <!-- ==================== APRESENTAÇÃO ==================== -->
   <section class="stage" id="stage"></section>
 </div>
 
-<!-- ============ MODAL ============ -->
+<!-- ==================== MODAL DETALHES ==================== -->
 <div class="backdrop" id="backdrop">
   <div class="modal" id="modal">
-    <button class="x" id="closeModal">×</button>
+    <button class="x" id="closeModal" title="Fechar">×</button>
     <div id="modalBody"></div>
-    <div class="navm">
-      <button class="btn" id="prev">← Anterior</button>
-      <span class="hint">Esc fecha · setas ← → navegam</span>
-      <button class="btn" id="next">Próxima →</button>
+    <div class="foot">
+      <button class="btn sm" id="prev">← Anterior</button>
+      <span class="hint">Esc fecha · ← → navegam</span>
+      <button class="btn sm" id="next">Próxima →</button>
     </div>
   </div>
 </div>
 
-<script>
-/* ================= DADOS ================= */
-const PHASES = ["Cadastros básicos","Produtos & Estoque","Comercial / Vendas","Financeiro & PCP","Fiscal / Cloud"];
-const S = {
-  cliente:{label:"Aguardando cliente",color:"#f5a524"},
-  desenvolvimento:{label:"Aguardando desenvolvimento",color:"#8b5cf6"},
-  andamento:{label:"Em andamento",color:"#4f8cff"},
-  risco:{label:"Atenção / Risco",color:"#f4526b"}
-};
-
-const DATA = [
-{
-  name:"Griffe", type:"Nova implantação", status:"cliente", progress:45,
-  statusText:"Aguardando retorno do cliente para podermos prosseguir.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes"],
-  pending:["Retorno do cliente para dar sequência à implantação"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["pend","Não iniciado"],["na","—"],["na","—"]],
-  note:"Base cadastral pronta. Próximo passo depende exclusivamente do retorno do cliente."
-},
-{
-  name:"Raguso", type:"Nova implantação", status:"cliente", progress:50,
-  statusText:"Aguardando retorno sobre o cadastro de matéria-prima e semielaborado para podermos rodar a produção. Preferência do cliente: começar pela produção e depois partir para os pedidos.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Cadastro de semielaborado","Cadastro de matéria-prima","Movimentações de estoque","Cadastros iniciais da produção"],
-  pending:["Validação do cadastro de matéria-prima e semielaborado (bloqueia o início da produção)"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["pend","Após produção"],["now","Produção em setup"],["na","—"]],
-  note:"Cadastros de produção montados; falta a validação do cliente para rodar o primeiro ciclo produtivo."
-},
-{
-  name:"Visual Destak", type:"Nova implantação", status:"cliente", progress:65,
-  statusText:"Aguardando o retorno da conexão de internet da empresa para finalizar as configurações de faturamento e então passar a emissão de notas para o Cloud.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Importação de clientes","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço de venda","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Cadastro de matéria-prima","Movimentações de estoque","Emissão de pedidos de venda","Emissão de orçamentos","Emissão de pedidos","Emissão de pedidos pelo UseCommerce"],
-  pending:["Conexão de internet do cliente","Configurações de faturamento","Migração da emissão de notas para o Cloud"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["done","Pedidos + UseCommerce"],["pend","Bloqueado"],["now","Faltam configs de faturamento"]],
-  note:"Uma das carteiras mais avançadas. Único bloqueio real: infraestrutura de internet do cliente."
-},
-{
-  name:"Terço e Cia", type:"Nova implantação", status:"cliente", progress:55,
-  statusText:"Aguardando retorno deles sobre o cadastro dos produtos para podermos passar à emissão de pedidos.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Cadastro de matéria-prima","Movimentações de estoque","Movimento de inventário","Cadastro de etiquetas para produtos de venda","Cadastro de detalhes do produto"],
-  pending:["Fechamento do cadastro de produtos","Início da emissão de pedidos"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["pend","Aguarda cadastro de produtos"],["na","—"],["na","—"]],
-  note:"Estoque e inventário operando; comercial trava no cadastro de produtos."
-},
-{
-  name:"Moderat", type:"Nova implantação", status:"desenvolvimento", progress:45,
-  statusText:"Aguardando as tabelas de importação de produtos, clientes e fornecedores serem preenchidas para dar treinamento sobre pedidos de venda e emissão de notas. Também aguardando retorno do desenvolvimento sobre as planilhas de importação do financeiro.",
-  done:["Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Cadastro de matéria-prima","Movimentações de estoque","Movimento de inventário"],
-  pending:["Preenchimento das planilhas de importação de produtos","Preenchimento das planilhas de importação de clientes","Preenchimento das planilhas de importação de fornecedores","Treinamento de pedidos de venda e emissão de notas","Planilhas de importação do financeiro (retorno do desenvolvimento)"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["now","Depende das importações"],["pend","Aguarda dev"],["pend","Aguarda notas"]],
-  note:"Duplo bloqueio: cliente precisa entregar as planilhas e o desenvolvimento precisa liberar o import financeiro."
-},
-{
-  name:"Doogs", type:"Reimplantação", status:"andamento", progress:80,
-  statusText:"Gravação de videoaulas para treinamento da ferramenta de integração com o Bling.",
-  done:["GRH completo","Módulo de produção completo","Todos os cadastros necessários para rodar a produção"],
-  pending:["Videoaulas da integração com o Bling","Treinamento final da integração"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["done","Concluído"],["done","Produção completa"],["now","Integração Bling"]],
-  note:"Escopo técnico entregue; fase final de treinamento/integração."
-},
-{
-  name:"McGyver (grupo)", type:"Migração Cloud", status:"andamento", progress:55,
-  statusText:"A migração do sistema para o Cloud irá finalizar as três empresas do grupo McGyver de uma vez só. Única parte em andamento é o PCP da Ponto Forte.",
-  done:["Banks: implantação no Delphi concluída","Eroika: controles básicos em uso (estoque e pedidos)"],
-  pending:["Migração das três empresas para o Cloud","Ponto Forte: Produção","Ponto Forte: Financeiro","Ponto Forte: Tesouraria"],
-  subs:[
-    ["Banks","Implantação no Delphi concluída · migrando para o Cloud","now"],
-    ["Ponto Forte","Pendente (Cloud): Produção · Financeiro · Tesouraria","pend"],
-    ["Eroika","Usando apenas controles básicos (estoque e pedidos)","now"]
-  ],
-  phases:[["done","Concluído"],["done","Concluído"],["now","Estoque + pedidos (Eroika)"],["pend","PCP Ponto Forte"],["now","Migração Cloud"]],
-  note:"Grupo com três CNPJs: a migração Cloud será entregue em bloco único. Ponto Forte concentra as pendências."
-},
-{
-  name:"Manos", type:"Reimplantação", status:"andamento", progress:65,
-  statusText:"Migrando o sistema para web (UseCloud) e repassando as solicitações de solução de erros.",
-  done:["Todo o controle de cadastros, movimentos e relatórios do estoque repassado","Migração do sistema para o UseCloud em andamento"],
-  pending:["Conclusão da migração para o UseCloud","Soluções de erros repassadas ao cliente"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["now","Em repasse"],["na","—"],["now","Migração Cloud"]],
-  note:"Estoque repassado por completo; foco na virada para web."
-},
-{
-  name:"Campos Verdes", type:"Nova implantação", status:"desenvolvimento", progress:30,
-  statusText:"Focando em treinamentos detalhados e retornos, para dar tempo do desenvolvimento finalizar a criação dos documentos fiscais que faltam para serem emitidos pelo sistema por eles.",
-  done:["Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda"],
-  pending:["Treinamentos detalhados","Criação dos documentos fiscais faltantes (desenvolvimento)","Emissão fiscal pelo próprio cliente"],
-  subs:[],
-  phases:[["done","Concluído"],["now","Cadastros em andamento"],["pend","Não iniciado"],["na","—"],["pend","Aguarda dev"]],
-  note:"Implantação inicial. Estratégia: ganhar tempo com treinamentos enquanto o dev entrega os documentos fiscais."
-},
-{
-  name:"Oficial", type:"Treinamento", status:"cliente", progress:50,
-  statusText:"Marcando reunião remota para fazer o treinamento sobre os relatórios e aguardando retorno das solicitações de ajuste para podermos entregar.",
-  done:["Treinamento completo sobre CRM"],
-  pending:["Relatórios","Entrega das solicitações de ajuste do CRM"],
-  subs:[],
-  phases:[["done","Concluído"],["na","—"],["done","CRM"],["pend","Relatórios"],["na","—"]],
-  note:"Carteira de pós-implantação: treinamento e ajustes de CRM."
-},
-{
-  name:"A1", type:"Nova implantação", status:"cliente", progress:75,
-  statusText:"Aguardando a finalização do cadastro de produtos para podermos emitir pedidos e controlar a emissão de notas.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Publicação de produtos","Agrupamento de produtos","Cadastro de cores e duplicação de produtos por cor","Inventário","Movimento de estoque","Posição de estoque","Controle de caixa","Emissão de pedidos (treinado, ainda não em uso)"],
-  pending:["Finalização do cadastro de produtos","Início da emissão de pedidos","Controle da emissão de notas"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["now","Treinado, sem uso"],["now","Controle de caixa"],["pend","Aguarda produtos"]],
-  note:"17 itens entregues. Falta o cliente concluir o cadastro de produtos para destravar o comercial."
-},
-{
-  name:"Fashion", type:"Nova implantação", status:"cliente", progress:80,
-  statusText:"Aguardando validação da entrada por nota para podermos começar o controle de estoque e assim emitir pedidos e notas pelo sistema.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Publicação de produtos","Agrupamento de produtos","Cadastro de cores e duplicação de produtos por cor","Inventário","Movimento de estoque","Posição de estoque","Controle de caixa","Emissão de pedidos (treinado, ainda não em uso)","Emissão de pedidos pelo UseCommerce","Entrada por nota diferenciada do PDV"],
-  pending:["Validação da entrada por nota","Início do controle de estoque","Emissão de pedidos e notas pelo sistema"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["done","Pedidos + UseCommerce"],["now","Controle de caixa"],["pend","Aguarda validação da nota"]],
-  note:"Carteira mais completa da lista (19 itens concluídos). Só falta validar a entrada por nota."
-},
-{
-  name:"Dias Couro", type:"Nova implantação", status:"risco", progress:25,
-  statusText:"Travado por falta de retorno e interesse do cliente pela implantação do sistema. De todos os treinamentos que foram feitos, nada foi cadastrado — mesmo cobrando retorno semanalmente e com visitas regulares. Analisar outra maneira de prosseguir.",
-  done:["Instalação do sistema nas máquinas","Cadastro de usuários","Liberação de telas","Cadastro de grupo, subgrupo e classe de produtos","Cadastro de produtos de venda","Tabela de preço","Cadastro de clientes","Cadastro de fornecedores","Cadastro de representantes","Publicação de produtos"],
-  pending:["Cliente não realizou nenhum cadastro após os treinamentos","Definir nova forma de conduzir a implantação (escalar / revisar cronograma)"],
-  subs:[],
-  phases:[["done","Concluído"],["pend","Nada cadastrado pelo cliente"],["pend","Não iniciado"],["na","—"],["na","—"]],
-  note:"CARTÃO VERMELHO: implantação parada por desinteresse do cliente. Precisa de decisão gerencial."
-},
-{
-  name:"Estilo Único Lavanderia", type:"Reimplantação", status:"andamento", progress:50,
-  statusText:"Voltou à ativa após a troca de funcionários. Treinamentos semanais para finalizar a implantação completa do PCP.",
-  done:["Cadastros iniciais","Planejamento de ficha para produção de lavagens"],
-  pending:["Treinamentos semanais","Finalização da implantação completa do PCP"],
-  subs:[],
-  phases:[["done","Concluído"],["done","Concluído"],["na","—"],["now","PCP em treinamento"],["na","—"]],
-  note:"Retomada após troca de equipe; ritmo semanal de treinamento."
-},
-{
-  name:"Confitex", type:"Treinamento", status:"cliente", progress:40,
-  statusText:"Aguardando o cliente começar a usar ativamente o PDV para podermos receber feedback.",
-  done:["Treinamento completo sobre PDV"],
-  pending:["Uso ativo do PDV pelo cliente","Coleta de feedback e ajustes"],
-  subs:[],
-  phases:[["done","Concluído"],["na","—"],["now","PDV treinado"],["na","—"],["na","—"]],
-  note:"Pós-treinamento: bola com o cliente para colocar o PDV em operação."
-}
-];
-
-/* ================= ESTADO ================= */
-let state = {status:"all", type:"all", q:"", sort:"origem", open:null, present:0};
-
-/* ================= HELPERS ================= */
-const $ = s=>document.querySelector(s);
-const pillColor = k => S[k].color;
-function pill(status){
-  const s=S[status];
-  return `<span class="pill" style="background:${s.color}22;color:${s.color};border:1px solid ${s.color}55">${s.label}</span>`;
-}
-const totalDone = DATA.reduce((a,d)=>a+d.done.length,0);
-
-/* ================= KPIs ================= */
-function renderKpis(){
-  const by = k => DATA.filter(d=>d.status===k).length;
-  const avg = Math.round(DATA.reduce((a,d)=>a+d.progress,0)/DATA.length);
-  const subCount = DATA.reduce((a,d)=>a+(d.subs?d.subs.length:0),0);
-  const cards = [
-    {v:DATA.length, l:"Carteiras ativas", s:`+ ${subCount} empresas no grupo McGyver`, a:"rgba(79,140,255,.5)"},
-    {v:avg+"%", l:"Progresso médio", s:"média ponderada por etapa entregue", a:"rgba(45,212,167,.5)"},
-    {v:by("cliente"), l:"Aguardando cliente", s:"retorno / validação pendente", a:"rgba(245,165,36,.5)"},
-    {v:by("desenvolvimento"), l:"Aguardando desenvolvimento", s:"dependem de dev / importações", a:"rgba(139,92,246,.5)"},
-    {v:by("andamento"), l:"Em andamento", s:"migração, treinamento ou integração", a:"rgba(79,140,255,.5)"},
-    {v:by("risco"), l:"Atenção / risco", s:"Dias Couro — sem retorno do cliente", a:"rgba(244,82,107,.5)"}
-  ];
-  $("#kpis").innerHTML = cards.map(c=>`
-    <div class="kpi" style="--accent:${c.a}">
-      <div class="v">${c.v}</div><div class="l">${c.l}</div><div class="s">${c.s}</div>
-    </div>`).join("");
-}
-
-/* ================= GRÁFICO DE STATUS ================= */
-function renderStatusChart(){
-  const counts = Object.keys(S).map(k=>({k, n:DATA.filter(d=>d.status===k).length}));
-  const max = Math.max(...counts.map(c=>c.n));
-  $("#statusChart").innerHTML = counts.map(c=>{
-    const pct = Math.round(c.n/DATA.length*100);
-    return `<div class="bar-row" data-status="${c.k}">
-      <div class="bar-label">${S[c.k].label}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${c.n/max*100}%;background:${S[c.k].color}"></div></div>
-      <div class="bar-val" style="color:${S[c.k].color}">${c.n} · ${pct}%</div>
-    </div>`;
-  }).join("");
-  document.querySelectorAll("#statusChart .bar-row").forEach(r=>{
-    r.onclick = ()=>{ setStatus(state.status===r.dataset.status?"all":r.dataset.status); };
-  });
-}
-
-function renderTypeChart(){
-  const types = [...new Set(DATA.map(d=>d.type))];
-  const counts = types.map(t=>({t, n:DATA.filter(d=>d.type===t).length})).sort((a,b)=>b.n-a.n);
-  const max = Math.max(...counts.map(c=>c.n));
-  const colors = {"Nova implantação":"#4f8cff","Reimplantação":"#2dd4a7","Migração Cloud":"#8b5cf6","Treinamento":"#f5a524"};
-  $("#typeChart").innerHTML = counts.map(c=>`
-    <div class="bar-row">
-      <div class="bar-label">${c.t}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${c.n/max*100}%;background:${colors[c.t]||"#4f8cff"}"></div></div>
-      <div class="bar-val">${c.n}</div>
-    </div>`).join("");
-
-  const cli = DATA.filter(d=>d.status==="cliente").length;
-  const dev = DATA.filter(d=>d.status==="desenvolvimento").length;
-  $("#gargalos").innerHTML = `
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div style="flex:1;min-width:150px;background:rgba(245,165,36,.10);border:1px solid rgba(245,165,36,.28);border-radius:12px;padding:12px">
-        <div style="font-size:22px;font-weight:800;color:#f5a524">${cli}/${DATA.length}</div>
-        <div style="font-size:11.5px;color:#ffd294;line-height:1.4">carteiras paradas por falta de retorno, validação ou uso por parte do cliente</div>
-      </div>
-      <div style="flex:1;min-width:150px;background:rgba(139,92,246,.10);border:1px solid rgba(139,92,246,.30);border-radius:12px;padding:12px">
-        <div style="font-size:22px;font-weight:800;color:#b79dff">${dev}/${DATA.length}</div>
-        <div style="font-size:11.5px;color:#d6c8ff;line-height:1.4">carteiras dependentes do desenvolvimento (documentos fiscais e planilhas de importação)</div>
-      </div>
-    </div>`;
-}
-
-/* ================= MATRIZ ================= */
-function renderMatrix(){
-  let html = `<div class="mx-head"></div>` + PHASES.map(p=>`<div class="mx-head">${p}</div>`).join("");
-  DATA.forEach(d=>{
-    html += `<div class="mx-name" title="${d.name}"><span style="width:8px;height:8px;border-radius:50%;background:${S[d.status].color};flex:none"></span>${d.name}</div>`;
-    d.phases.forEach(([st,txt])=>{
-      html += `<div class="cell ${st}" title="${txt}">${st==="done"?"✓":st==="now"?"●":st==="pend"?"!":"—"}</div>`;
-    });
-  });
-  $("#matrix").innerHTML = html;
-}
-
-/* ================= CARDS ================= */
-function filtered(){
-  let list = DATA.filter(d=>{
-    if(state.status!=="all" && d.status!==state.status) return false;
-    if(state.type!=="all" && d.type!==state.type) return false;
-    if(state.q){
-      const q=state.q.toLowerCase();
-      const hay = (d.name+" "+d.type+" "+d.statusText+" "+d.done.join(" ")+" "+d.pending.join(" ")+" "+(d.note||"")).toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
-    return true;
-  });
-  const s=state.sort;
-  if(s==="prog-desc") list.sort((a,b)=>b.progress-a.progress);
-  if(s==="prog-asc") list.sort((a,b)=>a.progress-b.progress);
-  if(s==="nome") list.sort((a,b)=>a.name.localeCompare(b.name,"pt-BR"));
-  if(s==="status") list.sort((a,b)=>a.status.localeCompare(b.status)||a.name.localeCompare(b.name,"pt-BR"));
-  return list;
-}
-
-function renderGrid(){
-  const list = filtered();
-  $("#empty").style.display = list.length? "none":"block";
-  $("#grid").innerHTML = list.map(d=>{
-    const c = S[d.status].color;
-    return `<article class="co" data-name="${d.name}" style="--accent:${c}">
-      <div class="hd">
-        <div><h3>${d.name}</h3><div class="type">${d.type}</div></div>
-        ${pill(d.status)}
-      </div>
-      <div class="prog">
-        <div class="top-line"><span>Progresso</span><b>${d.progress}%</b></div>
-        <div class="track"><i style="width:${d.progress}%"></i></div>
-      </div>
-      <p class="st">${d.statusText}</p>
-      <div class="meta">
-        <span><b>${d.done.length}</b> itens concluídos</span>
-        <span><b>${d.pending.length}</b> pendências</span>
-        ${d.subs&&d.subs.length?`<span><b>${d.subs.length}</b> empresas do grupo</span>`:""}
-      </div>
-    </article>`;
-  }).join("");
-  document.querySelectorAll(".co").forEach(el=>{
-    el.onclick = ()=>openModal(el.dataset.name);
-  });
-}
-
-/* ================= MODAL ================= */
-function modalHtml(d){
-  const c=S[d.status].color;
-  const steps = d.phases.map(([st,txt],i)=>{
-    const lbl = st==="done"?"Concluído":st==="now"?"Em andamento":st==="pend"?"Pendente":"Não previsto";
-    return `<div class="step ${st}">${PHASES[i]}<small>${lbl} · ${txt}</small></div>`;
-  }).join("");
-  const subs = (d.subs&&d.subs.length)? `<div class="box"><h4>Empresas do grupo</h4><ul class="list sub">${
-      d.subs.map(s=>`<li><b>${s[0]}</b> — ${s[1]}</li>`).join("")}</ul></div>`:"";
-  return `
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">
-      <div><h2 style="color:${c}">${d.name}</h2><div class="subline">${d.type} · ${d.done.length} itens concluídos · ${d.pending.length} pendências</div></div>
-      ${pill(d.status)}
-    </div>
-    <div class="prog" style="margin-top:16px">
-      <div class="top-line" style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px">
-        <span>Progresso da carteira</span><b style="color:var(--txt);font-size:14px">${d.progress}%</b></div>
-      <div class="track" style="height:11px"><i style="width:${d.progress}%"></i></div>
-    </div>
-    <div class="pipeline">${steps}</div>
-    <div class="cols">
-      <div class="box"><h4>O que foi concluído</h4><ul class="list">${d.done.map(t=>`<li>${t}</li>`).join("")}</ul></div>
-      <div class="box"><h4>Pendências / próximos passos</h4><ul class="list pend">${d.pending.map(t=>`<li>${t}</li>`).join("")}</ul></div>
-      ${subs}
-      <div class="statusbox"><h4 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#a9c8ff">Status atual</h4><p>${d.statusText}</p>${d.note?`<p style="margin-top:9px;font-size:12.5px;color:#9fb3d9">${d.note}</p>`:""}</div>
-    </div>`;
-}
-
-function openModal(name){
-  const d = DATA.find(x=>x.name===name);
-  if(!d) return;
-  state.open = name;
-  $("#modalBody").innerHTML = modalHtml(d);
-  $("#backdrop").classList.add("on");
-}
-function closeModal(){ $("#backdrop").classList.remove("on"); state.open=null; }
-function move(dir){
-  if(!state.open) return;
-  const list = filtered();
-  const idx = list.findIndex(d=>d.name===state.open);
-  if(idx<0) return;
-  const n = list[(idx+dir+list.length)%list.length].name;
-  openModal(n);
-}
-
-/* ================= APRESENTAÇÃO ================= */
-function renderPresent(){
-  const list = filtered();
-  if(!list.length){ $("#stage").innerHTML = `<div class="sh"><button class="btn" id="exitF">← Sair do modo apresentação</button></div><p>Nada para exibir com os filtros atuais.</p>`; bindExit(); return; }
-  state.present = Math.min(state.present, list.length-1);
-  const d = list[state.present];
-  const c = S[d.status].color;
-  const steps = d.phases.map(([st,txt],i)=>{
-    const lbl = st==="done"?"Concluído":st==="now"?"Em andamento":st==="pend"?"Pendente":"Não previsto";
-    return `<div class="step ${st}">${PHASES[i]}<small>${lbl}</small></div>`;
-  }).join("");
-  $("#stage").innerHTML = `
-    <div class="sh">
-      <button class="btn" id="exitF">← Sair do modo apresentação</button>
-      <div style="display:flex;gap:9px;align-items:center">
-        <span class="hint">${state.present+1} de ${list.length} · ${S[d.status].label}</span>
-        <button class="btn" id="pPrev">←</button>
-        <button class="btn" id="pNext">→</button>
-      </div>
-    </div>
-    <div class="big" style="--accent:${c};border-left:5px solid ${c}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">
-        <div>
-          <h2>${d.name}</h2>
-          <div class="subline" style="color:var(--muted);font-size:14px;margin-top:6px">${d.type}</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:46px;font-weight:800;letter-spacing:-2px;color:${c}">${d.progress}%</div>
-          <div style="font-size:12px;color:var(--muted)">progresso</div>
+<!-- ==================== MODAL EDITOR ==================== -->
+<div class="backdrop" id="editorBackdrop">
+  <div class="modal" id="editor">
+    <button class="x" id="closeEditor" title="Fechar">×</button>
+      <form id="form" autocomplete="off" novalidate>
+      <div class="form">
+        <h2 id="edTitle">Nova empresa</h2>
+        <p class="subline" id="edSub">Cadastre a empresa e mantenha o status sempre atualizado.</p>
+        <div class="fgrid" style="margin-top:18px">
+          <div>
+            <label class="f" for="fNome">Empresa *</label>
+            <input type="text" id="fNome" placeholder="Ex.: Raguso" required>
+          </div>
+          <div>
+            <label class="f" for="fTipo">Tipo de trabalho</label>
+            <input type="text" id="fTipo" list="tipos" placeholder="Ex.: Nova implantação">
+            <datalist id="tipos"></datalist>
+          </div>
+          <div>
+            <label class="f" for="fStatus">Status</label>
+            <select id="fStatus"></select>
+          </div>
+          <div>
+            <label class="f" for="fProg">Progresso: <span id="fProgVal">0%</span></label>
+            <input type="range" id="fProg" min="0" max="100" step="5" value="0" style="margin-top:8px">
+          </div>
+          <div class="full">
+            <label class="f" for="fStatusText">Status atual (o que está acontecendo agora)</label>
+            <textarea id="fStatusText" rows="3" placeholder="Ex.: Aguardando retorno do cliente sobre o cadastro de matéria-prima…"></textarea>
+          </div>
+          <div class="full">
+            <label class="f">O que já foi feito</label>
+            <div class="rows" id="rowsFeito"></div>
+            <button type="button" class="btn sm ghost" id="addFeito" style="margin-top:7px">+ adicionar item</button>
+          </div>
+          <div class="full">
+            <label class="f">O que ainda falta fazer</label>
+            <div class="rows" id="rowsFalta"></div>
+            <button type="button" class="btn sm ghost" id="addFalta" style="margin-top:7px">+ adicionar item</button>
+          </div>
+          <div class="full">
+            <label class="f">Outras empresas do grupo (opcional)</label>
+            <div class="rows" id="rowsGrupo"></div>
+            <button type="button" class="btn sm ghost" id="addGrupo" style="margin-top:7px">+ adicionar empresa</button>
+          </div>
+          <div class="full">
+            <details class="phases">
+              <summary>Fases da implantação (opcional)</summary>
+              <div id="phaseRows"></div>
+            </details>
+          </div>
+          <div class="full">
+            <label class="f" for="fObs">Observação interna (opcional)</label>
+            <textarea id="fObs" rows="2" placeholder="Anotação que só aparece no detalhe da empresa"></textarea>
+          </div>
+          <div>
+            <label class="f" for="fData">Data da atualização</label>
+            <input type="date" id="fData">
+          </div>
         </div>
       </div>
-      <div class="prog-big"><i style="width:${d.progress}%"></i></div>
-      <div class="pipeline">${steps}</div>
-      <div class="cols">
-        <div class="box"><h4>O que foi concluído</h4><ul class="list">${d.done.map(t=>`<li>${t}</li>`).join("")}</ul></div>
-        <div class="box"><h4>Pendências / próximos passos</h4><ul class="list pend">${d.pending.map(t=>`<li>${t}</li>`).join("")}</ul></div>
-        <div class="statusbox"><h4 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#a9c8ff">Status atual</h4><p>${d.statusText}</p></div>
+      <div class="foot">
+        <button type="button" class="btn sm danger" id="btnDelete" style="display:none">Excluir empresa</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button type="button" class="btn sm" id="cancelEditor">Cancelar</button>
+          <button type="submit" class="btn sm primary" id="saveEditor">Salvar</button>
+        </div>
       </div>
-    </div>`;
-  bindExit();
-  $("#pPrev").onclick = ()=>{state.present=(state.present-1+list.length)%list.length; renderPresent();};
-  $("#pNext").onclick = ()=>{state.present=(state.present+1)%list.length; renderPresent();};
-}
-function bindExit(){ const b=$("#exitF"); if(b) b.onclick = ()=>document.body.classList.remove("focus"); }
+    </form>
+  </div>
+</div>
 
-/* ================= EVENTOS ================= */
-function setStatus(k){
-  state.status=k; state.present=0;
-  document.querySelectorAll("[data-status].chip").forEach(el=>el.classList.toggle("on", el.dataset.status===k));
-  renderGrid(); if(document.body.classList.contains("focus")) renderPresent();
-}
-document.querySelectorAll(".chip[data-status]").forEach(el=>{
-  el.onclick = ()=>setStatus(el.dataset.status);
-});
-document.querySelectorAll(".chip[data-type]").forEach(el=>{
-  el.onclick = ()=>{
-    document.querySelectorAll(".chip[data-type]").forEach(x=>x.classList.remove("on"));
-    el.classList.add("on"); state.type=el.dataset.type; state.present=0;
-    renderGrid(); if(document.body.classList.contains("focus")) renderPresent();
-  };
-});
-$("#q").addEventListener("input", e=>{
-  state.q=e.target.value.trim(); state.present=0;
-  renderGrid(); if(document.body.classList.contains("focus")) renderPresent();
-});
-$("#sort").addEventListener("change", e=>{
-  state.sort=e.target.value; state.present=0;
-  renderGrid(); if(document.body.classList.contains("focus")) renderPresent();
-});
-$("#closeModal").onclick = closeModal;
-$("#backdrop").onclick = e=>{ if(e.target.id==="backdrop") closeModal(); };
-$("#prev").onclick = ()=>move(-1);
-$("#next").onclick = ()=>move(1);
-$("#btnPrint").onclick = ()=>window.print();
-$("#btnPresent").onclick = ()=>{ document.body.classList.add("focus"); renderPresent(); };
-document.addEventListener("keydown", e=>{
-  if(document.body.classList.contains("focus")){
-    if(e.key==="ArrowRight"){ state.present=(state.present+1)%filtered().length; renderPresent(); }
-    if(e.key==="ArrowLeft"){ const n=filtered().length; state.present=(state.present-1+n)%n; renderPresent(); }
-    if(e.key==="Escape") document.body.classList.remove("focus");
-    return;
-  }
-  if(state.open){
-    if(e.key==="Escape") closeModal();
-    if(e.key==="ArrowRight") move(1);
-    if(e.key==="ArrowLeft") move(-1);
-  }
-});
+<input type="file" id="fileInput" accept=".json,.js,.txt" style="display:none">
+<div id="toast"></div>
 
-/* ================= INIT ================= */
-$("#nAll").textContent = DATA.length;
-$("#nCli").textContent = DATA.filter(d=>d.status==="cliente").length;
-$("#nDev").textContent = DATA.filter(d=>d.status==="desenvolvimento").length;
-$("#nRun").textContent = DATA.filter(d=>d.status==="andamento").length;
-$("#nRisk").textContent = DATA.filter(d=>d.status==="risco").length;
-$("#subCount").textContent = `Visão consolidada de ${DATA.length} carteiras ativas · ${totalDone} itens entregues · ${DATA.reduce((a,d)=>a+d.pending.length,0)} pendências mapeadas`;
-renderKpis(); renderStatusChart(); renderTypeChart(); renderMatrix(); renderGrid();
-</script>
+<script src="dados.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
