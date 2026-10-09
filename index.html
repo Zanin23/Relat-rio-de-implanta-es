@@ -143,6 +143,31 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:13px}
 .legend i{font-style:normal;font-weight:700;margin-right:5px}
 
+/* ---------- relatórios complementares ---------- */
+.report-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.report-top h2{margin:0;font-size:14px;font-weight:650}
+.report-top p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+.report-actions{display:flex;gap:7px;flex-wrap:wrap}
+.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
+.report-grid .card{min-width:0}
+.report-grid .sub{margin-bottom:12px}
+.report-bar{display:flex;align-items:center;gap:9px;margin:9px 0;font-size:12px}
+.report-bar .label{width:68px;flex:none;color:var(--muted)}
+.report-bar .bar-track{height:7px}
+.report-bar .value{width:30px;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
+.report-list{display:flex;flex-direction:column;gap:7px}
+.report-row{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.report-row button.report-company{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:none;padding:0;text-align:left;color:var(--txt);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.report-row button.report-company:hover{color:var(--accent);text-decoration:underline}
+.report-row .report-meta{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.report-row .report-count{font-size:11px;font-weight:650;white-space:nowrap;color:var(--wait)}
+.report-row .report-date{flex:none;text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.report-badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:650;color:var(--muted);white-space:nowrap}
+.report-badge.visita{color:var(--dev);border-color:color-mix(in srgb,var(--dev) 32%,var(--line));background:color-mix(in srgb,var(--dev) 8%,transparent)}
+.report-badge.atrasado{color:var(--risk);border-color:color-mix(in srgb,var(--risk) 32%,var(--line));background:color-mix(in srgb,var(--risk) 8%,transparent)}
+.report-actions .btn{height:30px;font-size:11.5px}
+.report-note{font-size:11.5px;color:var(--faint);margin:10px 0 0}
+
 /* ============================================================
    FILTROS
    ============================================================ */
@@ -261,6 +286,9 @@ ul.list.grupo li::before{background:var(--dev)}
 .hist li{display:flex;gap:10px;align-items:baseline;font-size:12.5px;padding:4px 0;color:var(--muted)}
 .hist li time{color:var(--faint);font-variant-numeric:tabular-nums;flex:none;width:74px}
 .hist li b{color:var(--txt);font-weight:600}
+.schedule-items{display:grid;gap:7px;margin-top:8px}
+.schedule-item{padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.schedule-item b{font-size:12.5px;font-weight:600}
 
 /* ---------- formulário (editor) ---------- */
 .form{padding:22px 24px 4px}
@@ -278,6 +306,31 @@ details.phases summary:hover{color:var(--txt)}
 .prow{display:grid;grid-template-columns:150px 132px 1fr;gap:8px;align-items:center;margin-top:9px}
 .prow span{font-size:12.5px;color:var(--muted)}
 .prow select,.prow input{padding:6px 8px;font-size:12.5px}
+
+/* ---------- importação de cronograma PDF ---------- */
+.upload-drop{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1.5px dashed var(--line2);border-radius:11px;padding:17px;background:var(--surface2);transition:.14s}
+.upload-drop.drag{border-color:var(--accent);background:var(--accent-soft)}
+.upload-drop b{display:block;font-size:13px}
+.upload-drop .hint{margin-top:3px}
+.import-state{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);font-size:12.5px;color:var(--muted)}
+.import-state.err{border-color:color-mix(in srgb,var(--risk) 35%,var(--line));color:var(--risk)}
+.import-state.ok{border-color:color-mix(in srgb,var(--ok) 32%,var(--line));color:var(--ok)}
+.import-summary{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.import-summary span{padding:5px 9px;border-radius:99px;background:var(--surface2);border:1px solid var(--line);font-size:11.5px;color:var(--muted)}
+.import-summary b{color:var(--txt)}
+.table-wrap{overflow:auto;max-height:45vh;border:1px solid var(--line);border-radius:9px;margin-top:10px}
+table.preview{width:100%;min-width:1260px;border-collapse:collapse;font-size:11.5px}
+table.preview th{position:sticky;top:0;background:var(--surface2);color:var(--muted);text-align:left;font-weight:650;padding:8px;border-bottom:1px solid var(--line);z-index:1}
+table.preview td{padding:6px 7px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.preview tr:last-child td{border-bottom:0}
+table.preview select,table.preview input:not([type=checkbox]){min-width:80px;padding:6px 7px;font-size:11.5px}
+table.preview td:first-child select{min-width:145px}
+table.preview td.activity input{min-width:190px}
+table.preview td.use{text-align:center}
+table.preview input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+.pdf-raw{margin-top:11px}
+.pdf-raw summary{cursor:pointer;color:var(--muted);font-size:12px}
+.pdf-raw pre{max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-word;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);font-size:11px;color:var(--muted)}
 
 /* ---------- toast ---------- */
 #toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,14px);z-index:90;
@@ -320,7 +373,8 @@ body.focus .stage{display:block}
 }
 @media print{
   body{background:#fff}
-  .tools,.filters,.footer,.stage,.co .edit,.menu,.x,.modal .foot,#toast{display:none!important}
+  .tools,.filters,.footer,.stage,.co .edit,.menu,.x,.modal .foot,#toast,.report-actions{display:none!important}
+  .backdrop{display:none!important}
   .card,.co,.kpi,.modal{border-color:#ddd!important;box-shadow:none!important;background:#fff!important}
   .grid{grid-template-columns:1fr 1fr}
   .co .st{display:block;-webkit-line-clamp:unset;overflow:visible}
@@ -348,6 +402,7 @@ body.focus .stage{display:block}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input type="text" id="q" placeholder="Buscar empresa, item, pendência…">
       </div>
+      <button class="btn" id="btnScheduleImport" title="Ler um PDF de cronograma e atualizar o relatório">⬆ Importar cronograma</button>
       <button class="btn primary" id="btnNew">+ Nova empresa</button>
       <button class="sync off" id="syncPill" type="button" title="Sincronização com a equipe"><span class="pt"></span><span class="tx">—</span></button>
       <div class="menu" id="menu">
@@ -356,6 +411,7 @@ body.focus .stage{display:block}
           <button id="mExport"><span>⬇︎ Exportar JSON<small>backup com tudo o que está cadastrado</small></span></button>
           <button id="mExportJs"><span>⬇︎ Baixar dados.js<small>gera o arquivo para commitar (alternativa ao servidor)</small></span></button>
           <button id="mImport"><span>⬆︎ Importar JSON<small>substitui o relatório atual</small></span></button>
+          <button id="mImportSchedule"><span>▣ Importar cronograma PDF<small>atualiza status, prazos e visitas</small></span></button>
           <hr>
           <button id="mSync"><span>☁ Servidor compartilhado<small>status, conexão e tempo real</small></span></button>
           <button id="mPull"><span>↻ Buscar alterações da equipe<small>traz o que estiver no servidor agora</small></span></button>
@@ -384,6 +440,38 @@ body.focus .stage{display:block}
       <p class="sub">Natureza dos projetos em andamento</p>
       <div id="typeChart"></div>
       <p class="hint" id="gargalo" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)"></p>
+    </div>
+  </section>
+
+  <!-- ==================== RELATÓRIOS COMPLEMENTARES ==================== -->
+  <section id="reports">
+    <div class="report-top">
+      <div>
+        <h2>Relatórios complementares</h2>
+        <p>Progresso, principais pendências e agenda/visitas importadas do cronograma.</p>
+      </div>
+      <div class="report-actions">
+        <button class="btn" id="btnReportPortfolio">↓ Carteira CSV</button>
+        <button class="btn" id="btnReportPendencias">↓ Pendências CSV</button>
+        <button class="btn" id="btnReportAgenda">↓ Agenda e visitas CSV</button>
+      </div>
+    </div>
+    <div class="report-grid">
+      <div class="card">
+        <h2>Carteiras por progresso</h2>
+        <p class="sub">Faixas de conclusão do conjunto de implantações</p>
+        <div id="progressReport"></div>
+      </div>
+      <div class="card">
+        <h2>Maiores pendências</h2>
+        <p class="sub">Empresas com mais itens em aberto registrados</p>
+        <div id="priorityReport"></div>
+      </div>
+      <div class="card">
+        <h2>Agenda, visitas e prazos</h2>
+        <p class="sub">Próximos itens importados do PDF e prazos vencidos</p>
+        <div id="agendaReport"></div>
+      </div>
     </div>
   </section>
 
@@ -503,6 +591,49 @@ body.focus .stage{display:block}
   </div>
 </div>
 
+<!-- ==================== MODAL IMPORTAR CRONOGRAMA PDF ==================== -->
+<div class="backdrop" id="scheduleBackdrop">
+  <div class="modal" id="scheduleModal" style="max-width:1100px">
+    <button class="x" id="closeSchedule" title="Fechar">×</button>
+    <div class="body">
+      <h2>Atualizar pelo cronograma</h2>
+      <p class="subline">O PDF é lido neste navegador. No modelo enviado, o leitor reconhece as fases numeradas, CONCLUÍDO/PENDENTE e Previsto, Visita agendada, Concluído e Responsável. Confira a prévia antes de aplicar.</p>
+      <div class="upload-drop" id="scheduleDrop" style="margin-top:16px">
+        <div>
+          <b>Selecione ou arraste um cronograma em PDF</b>
+          <p class="hint">PDFs com texto são reconhecidos. Arquivos digitalizados como imagem precisam de OCR antes da importação.</p>
+        </div>
+        <button class="btn primary" type="button" id="scheduleChooseFile">Escolher PDF</button>
+      </div>
+      <input type="file" id="scheduleFileInput" accept="application/pdf,.pdf" hidden>
+      <div class="import-state" id="scheduleImportState" role="status" aria-live="polite">Nenhum arquivo selecionado. O relatório não será alterado até você clicar em “Aplicar atualizações”.</div>
+      <div id="schedulePreviewArea" style="display:none">
+        <div class="import-summary" id="scheduleSummary"></div>
+        <div style="display:flex;justify-content:flex-end;margin:4px 0 8px">
+          <button type="button" class="btn sm" id="scheduleAddRow">+ Adicionar linha manual</button>
+        </div>
+        <div class="table-wrap">
+          <table class="preview">
+            <thead><tr><th>Empresa</th><th>Fase</th><th>Atividade / item</th><th>Previsto</th><th>Visita</th><th>Concluído em</th><th>Hora</th><th>Responsável</th><th>Tipo</th><th>Status</th><th>%</th><th title="Incluir na atualização">Usar</th></tr></thead>
+            <tbody id="schedulePreview"></tbody>
+          </table>
+        </div>
+        <details class="pdf-raw">
+          <summary>Ver texto extraído do PDF (para conferir a leitura)</summary>
+          <pre id="scheduleRawText"></pre>
+        </details>
+      </div>
+    </div>
+    <div class="foot">
+      <span class="hint" id="scheduleFootHint">Só empresas selecionadas são alteradas; os itens substituem o cronograma anterior daquela empresa. PENDENTE genérico vira Em andamento, todas as etapas concluídas viram Concluído e o progresso só muda com percentual explícito.</span>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="btn sm" id="cancelSchedule">Cancelar</button>
+        <button class="btn sm primary" id="scheduleApply" disabled>Aplicar atualizações</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== MODAL SERVIDOR COMPARTILHADO ==================== -->
 <div class="backdrop" id="syncBackdrop">
   <div class="modal" id="syncModal" style="max-width:660px">
@@ -541,6 +672,7 @@ body.focus .stage{display:block}
 <script src="sync-config.js"></script>
 <script src="mock-supabase.js"></script>
 <script src="sync.js"></script>
+<script src="cronograma-pdf.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

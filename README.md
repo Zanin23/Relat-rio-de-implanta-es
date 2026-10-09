@@ -15,12 +15,13 @@ dois cliques.
 ```
 index.html          -> o dashboard inteiro (HTML + CSS)
 dados.js            -> os dados do relatório (o baseline que volta no "Restaurar")
-app.js              -> toda a lógica: filtros, editor, salvamento, export/import
+app.js              -> toda a lógica: filtros, editor, salvamento, export/import e relatórios
+cronograma-pdf.js   -> leitura local do PDF e interpretação das linhas do cronograma
 sync.js             -> sincronização compartilhada (merge, diff, tempo real)
 sync-config.js      -> URL + anon key do Supabase  (é isto que vale para todos)
 supabase.sql        -> roda uma vez no SQL Editor do Supabase
 mock-supabase.js    -> simula o servidor no navegador para testar (?mock=1)
-vendor/             -> supabase-js (bundle pronto, sem build)
+vendor/             -> Supabase JS e PDF.js (bundles prontos, sem build)
 vercel.json         -> configuração de deploy na Vercel
 ```
 
@@ -59,6 +60,38 @@ assim dá para ver a evolução da carteira.
 
 > Atalhos: clique no card abre o detalhe · `Enter` abre · `E` edita ·
 > `/` foca a busca · `Esc` fecha · `← →` navegam entre empresas.
+
+### Importar cronograma PDF
+
+Use **Importar cronograma** no topo (ou **Dados ▾ → Importar cronograma PDF**):
+
+1. Selecione/arraste o PDF. A leitura é feita **localmente no navegador**; o
+   arquivo não é enviado ao Supabase nem a outro servidor.
+2. Confira e edite a prévia: empresa, fase, atividade, datas prevista/visita/
+   conclusão, hora, responsável, tipo, status e progresso. As linhas não
+   reconhecidas podem ser ajustadas, associadas manualmente a uma empresa,
+   desmarcadas ou adicionadas manualmente.
+3. Clique **Aplicar atualizações**. Para cada empresa selecionada, os itens do
+   cronograma importado substituem o cronograma anterior daquela empresa. O
+   status `PENDENTE` é tratado como **Em andamento**; todas as etapas concluídas
+   marcam a empresa como **Concluído**. O progresso só muda quando o PDF contém
+   percentuais. As mudanças entram no histórico e, se a empresa estiver
+   sincronizada, são enviadas à equipe.
+
+A leitura reconhece PDFs que contêm texto pesquisável. O modelo analisado
+organiza as etapas em fases numeradas e mostra `CONCLUÍDO`/`PENDENTE`, além de
+`Previsto`, `Visita agendada`, `Concluído` e `Resp.`. Esses campos são associados
+à atividade logo acima; visitas e datas de conclusão também aparecem nos
+relatórios. Se o arquivo for uma imagem digitalizada, aplique OCR antes de
+importá-lo. Outros formatos podem exigir ajustes; revise sempre a prévia antes
+de confirmar.
+
+### Relatórios complementares
+
+A seção **Relatórios complementares** apresenta a distribuição da carteira por
+faixa de progresso, as empresas com mais pendências e os próximos itens/prazos
+(avisando quando estiverem vencidos). Ela também oferece exportação CSV da
+carteira, das pendências e da agenda/visitas para abrir no Excel ou similar.
 
 ## Onde os dados ficam salvos
 
@@ -167,7 +200,13 @@ Cada empresa em `dados.js` (e cada linha `dados` do banco):
   grupo: ["Filial X — pendente Cloud"],   // opcional
   fases: [["done",""],["done",""],["pend",""],["now",""],["na",""]],
   observacao: "Nota interna",   // opcional
-  atualizado: "2026-10-08"
+  atualizado: "2026-10-08",
+  cronograma: [{               // opcional: preenchido pela importação de PDF
+    fase: "Estoque", atividade: "Inventário",
+    data: "2026-10-12", visitaData: "2026-10-13", concluidoEm: "",
+    responsavel: "Matheus Zanin", hora: "14:00",
+    categoria: "etapa", status: "pendente", progresso: null, origem: "cronograma.pdf"
+  }]
 }
 ```
 
