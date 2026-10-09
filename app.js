@@ -937,7 +937,37 @@
     return html;
   }
 
+  // preenche o seletor “Vincular todas as atividades a” com as empresas cadastradas
+  function atualizarSeletorVinculoCronograma() {
+    var empresas = db.empresas.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
+    var seletor = $("#scheduleLinkCompany");
+    var anterior = seletor.value;
+    seletor.innerHTML = '<option value="">— escolha a empresa —</option>' + empresas.map(function (e) {
+      return '<option value="' + esc(e.id) + '">' + esc(e.nome) + "</option>";
+    }).join("");
+    if (anterior && porId(anterior)) seletor.value = anterior;
+    $("#scheduleLinkApply").disabled = !empresas.length;
+  }
+
+  // vincula TODAS as atividades da prévia à empresa escolhida e marca para importar as que têm texto
+  function vincularTodasAtividades() {
+    var empresaId = $("#scheduleLinkCompany").value;
+    var empresa = porId(empresaId);
+    if (!empresa) { toast("Escolha uma empresa cadastrada para vincular."); return; }
+    atualizarLinhasDaPrevia();
+    var vinculadas = 0;
+    pdfImport.linhas.forEach(function (linha) {
+      linha.empresaId = empresa.id;
+      linha.empresaNome = empresa.nome;
+      if (String(linha.atividade || "").trim()) linha.usar = true;
+      vinculadas++;
+    });
+    renderTabelaCronograma();
+    toast(vinculadas + " atividade(s) vinculada(s) a " + empresa.nome + ".");
+  }
+
   function renderTabelaCronograma() {
+    atualizarSeletorVinculoCronograma();
     var empresas = db.empresas.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
     var html = pdfImport.linhas.map(function (linha, i) {
       var nomeNovo = String(linha.empresaCsv || "").trim();
@@ -1409,6 +1439,7 @@
     processarArquivoImportacao(arquivo);
   };
   $("#scheduleAddRow").onclick = adicionarLinhaCronogramaManual;
+  $("#scheduleLinkApply").onclick = vincularTodasAtividades;
   $("#scheduleApply").onclick = function () {
     if (modoImportacaoAtual() === "empresas") aplicarEmpresasCsv();
     else aplicarCronogramaImportado();
