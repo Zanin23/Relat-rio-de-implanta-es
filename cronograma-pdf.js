@@ -286,8 +286,10 @@
           if (aoProgresso) tarefa.onProgress = aoProgresso;
           var pdf = await tarefa.promise;
           var totalPaginas = pdf.numPages;
+          // A liberação do documento fica no PDFDocumentLoadingTask (tarefa.destroy()).
+          // O PDFDocumentProxy (pdf) não tem destroy() nas versões recentes do PDF.js.
           if (totalPaginas > MAX_PAGINAS) {
-            await pdf.destroy();
+            await tarefa.destroy();
             throw new Error("O PDF tem " + totalPaginas + " páginas. O limite para importação é " + MAX_PAGINAS + ".");
           }
           var linhas = [], textoTotal = "";
@@ -300,7 +302,7 @@
                 textoTotal += linha.texto + "\n";
               });
             }
-          } finally { await pdf.destroy(); }
+          } finally { await tarefa.destroy(); }
           resolve({ paginas: totalPaginas, linhas: linhas, texto: textoTotal.slice(0, MAX_TEXTO) });
         })().catch(function (erro) {
           var msg = erro && erro.name === "PasswordException"
