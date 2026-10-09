@@ -6,6 +6,7 @@
    · Sincroniza com o Supabase via sync.js -> o que um altera vale para todos
    · Permite cadastrar novas empresas e atualizar as existentes
    · Exporta/importa JSON (backup) e gera o dados.js para commitar no Git
+   · Importa cronograma em PDF e planilhas CSV (agenda ou carteira de empresas)
    ===================================================================== */
 (function () {
   "use strict";
@@ -53,7 +54,8 @@
   var db = { data: "", empresas: [] };          // dados ativos
   var tocados = {};                             // ids editados NESTA sessão (desempate de conflito)
   var editando = null;                          // id da empresa em edição
-  var pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false };
+  var pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false, fonte: "PDF" };
+  var csvImport = { arquivo: "", analise: null, linhas: [], modo: "" };   // prévia da carteira vinda de CSV
   var ui = { status: "all", type: "all", q: "", sort: "origem", aberto: null, present: 0 };
 
   /* ================= HELPERS ================= */
@@ -92,6 +94,13 @@
     var hsh = 5381;
     for (var i = 0; i < cruza.length; i++) hsh = ((hsh << 5) + hsh + cruza.charCodeAt(i)) >>> 0;
     return "n" + k + "-" + hsh.toString(36);
+  }
+
+  // normalização usada para não duplicar itens de lista vindos de planilha
+  function chaveTexto(v) {
+    var s = String(v == null ? "" : v).toLowerCase();
+    try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (e) {}
+    return s.replace(/[^a-z0-9]+/g, " ").trim();
   }
 
   function toast(msg) {
@@ -393,7 +402,7 @@
             (vencido ? ' <span class="report-badge atrasado">Vencido</span>' : "") + "</div>" +
             '<span class="report-date">' + (item.data ? esc(br(item.data)) : "Sem data") + (item.hora ? "<br>" + esc(item.hora) : "") + "</span></div>";
         }).join("") + "</div>" : '<p class="none">Todos os itens do cronograma estão concluídos.</p>')
-      : '<p class="none">Importe um cronograma PDF para preencher este relatório de agenda e visitas.</p><button type="button" class="btn sm" id="reportImportSchedule">Importar cronograma PDF</button>';
+      : '<p class="none">Importe um cronograma em PDF ou CSV para preencher este relatório de agenda e visitas.</p><button type="button" class="btn sm" id="reportImportSchedule">Importar cronograma (PDF/CSV)</button>';
 
     $$("[data-report-company]").forEach(function (button) {
       button.onclick = function () { abrirDetalhe(button.dataset.reportCompany); };
@@ -825,6 +834,12 @@
     var f = this.files && this.files[0];
     this.value = "";
     if (!f) return;
+    // planilha escolhida aqui por engano (ou de propósito): abre o importador de CSV
+    if (/\.(csv|tsv)$/i.test(f.name || "")) {
+      abrirImportadorCronograma();
+      processarArquivoImportacao(f);
+      return;
+    }
     var r = new FileReader();
     r.onload = function () {
       var p;
@@ -844,21 +859,31 @@
     r.readAsText(f);
   };
 
-  /* ================= IMPORTAR CRONOGRAMA PDF ================= */
-  function estadoImportacaoPdf(texto, tipo) {
+  /* ========== IMPORTAR CRONOGRAMA (PDF) OU PLANILHA (CSV) ========== */
+  function estadoImportacao(texto, tipo) {
     var el = $("#scheduleImportState");
     el.className = "import-state" + (tipo ? " " + tipo : "");
     el.textContent = texto;
   }
 
-  function abrirImportadorCronograma() {
-    pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false };
-    $("#scheduleFileInput").value = "";
+  function limparPreviasImportacao() {
+    pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false, fonte: "PDF" };
+    csvImport = { arquivo: "", analise: null, linhas: [], modo: "" };
     $("#schedulePreviewArea").style.display = "none";
     $("#schedulePreview").innerHTML = "";
-    $("#scheduleChooseFile").disabled = false;
+    $("#companyPreviewArea").style.display = "none";
+    $("#companyPreview").innerHTML = "";
+    $("#importModeWrap").style.display = "none";
     $("#scheduleApply").disabled = true;
-    estadoImportacaoPdf("Nenhum arquivo selecionado. O relatório não será alterado até você clicar em “Aplicar atualizações”.", "");
+    $("#scheduleApply").textContent = "Aplicar atualizações";
+  }
+
+  function abrirImportadorCronograma() {
+    limparPreviasImportacao();
+    $("#scheduleFileInput").value = "";
+    $("#scheduleChooseFile").disabled = false;
+    atualizarRodapeImportacao("");
+    estadoImportacao("Nenhum arquivo selecionado — PDF de cronograma ou planilha CSV. O relatório não será alterado até você clicar em “Aplicar”.", "");
     $("#scheduleBackdrop").classList.add("on");
   }
 
@@ -866,6 +891,43 @@
     $("#scheduleBackdrop").classList.remove("on");
   }
 
+  function atualizarRodapeImportacao(modo) {
+    $("#scheduleFootHint").textContent = modo === "empresas"
+      ? "Cada linha vira uma empresa: as já cadastradas são atualizadas (campos em branco no CSV não apagam nada) e as marcadas como “criar nova” entram no relatório. Tudo fica registrado no histórico."
+      : "Só empresas selecionadas são alteradas; os itens substituem o cronograma anterior daquela empresa. PENDENTE genérico vira Em andamento, todas as etapas concluídas viram Concluído e o progresso só muda com percentual explícito.";
+    $("#scheduleApply").textContent = modo === "empresas" ? "Cadastrar / atualizar empresas" : "Aplicar atualizações";
+  }
+
+  function modoImportacaoAtual() {
+    return $("#companyPreviewArea").style.display === "none" ? "cronograma" : "empresas";
+  }
+
+  // cria a empresa que veio do arquivo e ainda não existe no relatório
+  function criarEmpresaDoImport(nome, dados, textoHistorico) {
+    var d = dados || {};
+    var reg = normalizar({
+      nome: String(nome || "").trim().slice(0, 120) || "Nova empresa",
+      tipo: d.tipo || "Outro",
+      status: STATUS[d.status] ? d.status : "andamento",
+      progresso: d.progresso == null ? 0 : clamp(num(d.progresso, 0), 0, 100),
+      statusText: d.statusText || "",
+      feito: d.feito || [],
+      falta: d.falta || [],
+      grupo: d.grupo || [],
+      observacao: d.observacao || "",
+      atualizado: d.atualizado || hoje()
+    });
+    if (porId(reg.id)) reg.id = id();          // nome repetido com outro id: não sobrescreve ninguém
+    reg.historico = [{
+      data: reg.atualizado, progresso: reg.progresso, status: reg.status,
+      texto: String(textoHistorico || "Cadastrada por importação").slice(0, 90)
+    }];
+    db.empresas.push(reg);
+    tocados[reg.id] = true;
+    return reg;
+  }
+
+  /* ---------- prévia: cronograma (PDF e CSV) ---------- */
   function opcoesStatusCronograma(selecionado) {
     var html = '<option value="">Não reconhecido — não muda o status</option>' +
       '<option value="pendente"' + (selecionado === "pendente" ? " selected" : "") + ">Pendente</option>";
@@ -878,9 +940,12 @@
   function renderTabelaCronograma() {
     var empresas = db.empresas.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
     var html = pdfImport.linhas.map(function (linha, i) {
-      var opEmpresas = '<option value="">— selecione —</option>' + empresas.map(function (e) {
-        return '<option value="' + esc(e.id) + '"' + (linha.empresaId === e.id ? " selected" : "") + ">" + esc(e.nome) + "</option>";
-      }).join("");
+      var nomeNovo = String(linha.empresaCsv || "").trim();
+      var opEmpresas = '<option value="">— selecione —</option>' +
+        (nomeNovo ? '<option value="__nova__"' + (linha.empresaId === "__nova__" ? " selected" : "") + ">+ criar “" + esc(nomeNovo) + "”</option>" : "") +
+        empresas.map(function (e) {
+          return '<option value="' + esc(e.id) + '"' + (linha.empresaId === e.id ? " selected" : "") + ">" + esc(e.nome) + "</option>";
+        }).join("");
       var prog = linha.progresso == null ? "" : linha.progresso;
       return '<tr data-pdf-row="' + i + '">' +
         '<td><select data-field="empresaId" aria-label="Empresa">' + opEmpresas + "</select></td>" +
@@ -904,56 +969,24 @@
   function atualizarResumoCronograma() {
     var linhas = pdfImport.linhas || [];
     var selecionadas = linhas.filter(function (r) { return r.usar && r.empresaId && String(r.atividade || "").trim(); });
-    var empresas = {};
-    selecionadas.forEach(function (r) { empresas[r.empresaId] = true; });
+    var empresas = {}, novas = {};
+    selecionadas.forEach(function (r) {
+      if (r.empresaId === "__nova__") novas[chaveNome(r.empresaCsv) || r.id] = true;
+      else empresas[r.empresaId] = true;
+    });
     var statusConhecidos = selecionadas.filter(function (r) { return !!STATUS[r.status] || r.status === "pendente"; }).length;
     var visitas = selecionadas.filter(function (r) { return r.categoria === "visita" || !!r.visitaData; }).length;
     var semEmpresa = linhas.filter(function (r) { return !r.empresaId; }).length;
+    var qtdNovas = Object.keys(novas).length;
     $("#scheduleSummary").innerHTML =
       '<span><b>' + linhas.length + "</b> itens lidos</span>" +
       '<span><b>' + selecionadas.length + "</b> selecionados</span>" +
-      '<span><b>' + Object.keys(empresas).length + "</b> empresas</span>" +
+      '<span><b>' + (Object.keys(empresas).length + qtdNovas) + "</b> empresas</span>" +
+      (qtdNovas ? '<span><b>' + qtdNovas + "</b> a cadastrar</span>" : "") +
       '<span><b>' + statusConhecidos + "</b> status reconhecidos</span>" +
       '<span><b>' + visitas + "</b> visitas</span>" +
       (semEmpresa ? '<span><b>' + semEmpresa + "</b> sem empresa associada</span>" : "");
     $("#scheduleApply").disabled = !selecionadas.length || pdfImport.carregando;
-  }
-
-  async function processarPdfCronograma(arquivo) {
-    if (!arquivo) return;
-    pdfImport = { arquivo: arquivo.name || "cronograma.pdf", linhas: [], texto: "", paginas: 0, carregando: true };
-    $("#schedulePreviewArea").style.display = "none";
-    $("#scheduleChooseFile").disabled = true;
-    $("#scheduleApply").disabled = true;
-    estadoImportacaoPdf("Lendo “" + pdfImport.arquivo + "”… o arquivo permanece neste dispositivo.", "");
-    try {
-      if (!window.CRONOGRAMA_PDF) throw new Error("O leitor de PDF não carregou. Atualize a página e tente novamente.");
-      var extraido = await window.CRONOGRAMA_PDF.lerPdf(arquivo);
-      pdfImport.paginas = extraido.paginas;
-      pdfImport.texto = extraido.texto || "";
-      if (!pdfImport.texto.trim()) {
-        $("#schedulePreviewArea").style.display = "";
-        $("#scheduleRawText").textContent = "Nenhum texto foi encontrado. Este arquivo provavelmente é uma digitalização. É necessário aplicar OCR ao PDF antes de importar.";
-        estadoImportacaoPdf("Não encontrei texto pesquisável no PDF. Se ele foi digitalizado como imagem, aplique OCR e envie novamente.", "err");
-        return;
-      }
-      pdfImport.linhas = window.CRONOGRAMA_PDF.interpretarLinhas(extraido.linhas, db.empresas);
-      $("#schedulePreviewArea").style.display = "";
-      $("#scheduleRawText").textContent = pdfImport.texto;
-      renderTabelaCronograma();
-      var avisoLimite = extraido.linhas.length > window.CRONOGRAMA_PDF.maxLinhas ? " A prévia foi limitada a " + window.CRONOGRAMA_PDF.maxLinhas + " linhas." : "";
-      if (pdfImport.linhas.length) {
-        estadoImportacaoPdf("PDF lido: " + pdfImport.paginas + " página(s). Revise a empresa, a atividade e o status em cada linha antes de aplicar." + avisoLimite, "ok");
-      } else {
-        estadoImportacaoPdf("Extraí texto de " + pdfImport.paginas + " página(s), mas não reconheci linhas de atividade automaticamente. Adicione linhas manualmente ou envie este PDF para ajustarmos o leitor ao formato." + avisoLimite, "err");
-      }
-    } catch (erro) {
-      estadoImportacaoPdf(erro && erro.message ? erro.message : "Não foi possível ler o PDF.", "err");
-    } finally {
-      pdfImport.carregando = false;
-      $("#scheduleChooseFile").disabled = false;
-      atualizarResumoCronograma();
-    }
   }
 
   function atualizarLinhasDaPrevia() {
@@ -967,13 +1000,13 @@
         else linha[nome] = campo.value;
       });
       var empresa = porId(linha.empresaId);
-      linha.empresaNome = empresa ? empresa.nome : "";
+      linha.empresaNome = empresa ? empresa.nome : (linha.empresaId === "__nova__" ? String(linha.empresaCsv || "") : "");
     });
   }
 
   function adicionarLinhaCronogramaManual() {
     pdfImport.linhas.push({
-      id: "pdf-manual-" + (pdfImport.linhas.length + 1), empresaId: "", empresaNome: "",
+      id: "import-manual-" + (pdfImport.linhas.length + 1), empresaId: "", empresaNome: "", empresaCsv: "",
       atividade: "", fase: "", data: "", visitaData: "", concluidoEm: "", responsavel: "",
       hora: "", categoria: "etapa", status: "", progresso: null,
       usar: false, pagina: 0, trecho: ""
@@ -983,6 +1016,222 @@
     if (ultima) ultima.focus();
   }
 
+  /* ---------- prévia: carteira de empresas (CSV) ---------- */
+  function opcoesStatusEmpresa(selecionado) {
+    var html = '<option value="">Manter o atual</option>';
+    Object.keys(STATUS).forEach(function (k) {
+      html += '<option value="' + k + '"' + (selecionado === k ? " selected" : "") + ">" + esc(STATUS[k].label) + "</option>";
+    });
+    return html;
+  }
+
+  function renderTabelaEmpresas() {
+    var empresas = db.empresas.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
+    $("#tipos").innerHTML = TIPOS.map(function (t) { return '<option value="' + esc(t) + '">'; }).join("");
+    var html = csvImport.linhas.map(function (linha, i) {
+      var alvo = porId(linha.empresaId);
+      var opEmpresas = '<option value=""' + (alvo ? "" : " selected") + ">+ criar nova empresa</option>" +
+        empresas.map(function (e) {
+          return '<option value="' + esc(e.id) + '"' + (alvo && alvo.id === e.id ? " selected" : "") + ">" + esc(e.nome) + "</option>";
+        }).join("");
+      var prog = linha.progresso == null ? "" : linha.progresso;
+      return '<tr data-company-row="' + i + '">' +
+        '<td><select data-field="empresaId" aria-label="Empresa de destino">' + opEmpresas + "</select></td>" +
+        '<td class="activity"><input type="text" data-field="nome" value="' + esc(alvo ? alvo.nome : linha.nome) + '"' + (alvo ? " disabled" : "") + ' aria-label="Nome da empresa"></td>' +
+        '<td><input type="text" data-field="tipo" list="tipos" value="' + esc(linha.tipo || "") + '" placeholder="—" aria-label="Tipo de trabalho"></td>' +
+        '<td><select data-field="status" aria-label="Status">' + opcoesStatusEmpresa(linha.status) + "</select></td>" +
+        '<td><input type="number" min="0" max="100" step="1" data-field="progresso" value="' + esc(prog) + '" placeholder="—" aria-label="Progresso percentual"></td>' +
+        '<td class="activity"><input type="text" data-field="statusText" value="' + esc(linha.statusText || "") + '" placeholder="—" aria-label="Status atual"></td>' +
+        '<td class="activity"><input type="text" data-field="feito" value="' + esc((linha.feito || []).join(" | ")) + '" placeholder="item | item" aria-label="O que já foi feito"></td>' +
+        '<td class="activity"><input type="text" data-field="falta" value="' + esc((linha.falta || []).join(" | ")) + '" placeholder="item | item" aria-label="O que ainda falta"></td>' +
+        '<td><input type="date" data-field="atualizado" value="' + esc(linha.atualizado || "") + '" aria-label="Data da atualização"></td>' +
+        '<td class="use"><input type="checkbox" data-field="usar"' + (linha.usar ? " checked" : "") + ' aria-label="Usar esta linha"></td>' +
+        "</tr>";
+    }).join("");
+    $("#companyPreview").innerHTML = html;
+    atualizarResumoEmpresas();
+  }
+
+  function atualizarResumoEmpresas() {
+    var linhas = csvImport.linhas || [];
+    var selecionadas = linhas.filter(function (r) { return r.usar && (porId(r.empresaId) || String(r.nome || "").trim()); });
+    var novas = selecionadas.filter(function (r) { return !porId(r.empresaId); }).length;
+    var comStatus = selecionadas.filter(function (r) { return !!STATUS[r.status]; }).length;
+    var comProgresso = selecionadas.filter(function (r) { return r.progresso != null; }).length;
+    var comListas = selecionadas.filter(function (r) { return (r.feito || []).length || (r.falta || []).length; }).length;
+    $("#companySummary").innerHTML =
+      '<span><b>' + linhas.length + "</b> linhas lidas</span>" +
+      '<span><b>' + selecionadas.length + "</b> selecionadas</span>" +
+      '<span><b>' + novas + "</b> a cadastrar</span>" +
+      '<span><b>' + (selecionadas.length - novas) + "</b> a atualizar</span>" +
+      '<span><b>' + comStatus + "</b> com status</span>" +
+      '<span><b>' + comProgresso + "</b> com progresso</span>" +
+      (comListas ? '<span><b>' + comListas + "</b> com listas de itens</span>" : "");
+    $("#scheduleApply").disabled = !selecionadas.length;
+  }
+
+  function atualizarLinhasEmpresasDaPrevia() {
+    $$("#companyPreview tr[data-company-row]").forEach(function (tr) {
+      var i = num(tr.dataset.companyRow, -1), linha = csvImport.linhas[i];
+      if (!linha) return;
+      $$("[data-field]", tr).forEach(function (campo) {
+        var nome = campo.dataset.field;
+        if (nome === "usar") linha.usar = campo.checked;
+        else if (nome === "progresso") linha.progresso = campo.value === "" ? null : clamp(num(campo.value, 0), 0, 100);
+        else if (nome === "feito" || nome === "falta") linha[nome] = listaDoCampo(campo.value);
+        else if (nome === "nome") { if (!campo.disabled) linha.nome = campo.value; }
+        else linha[nome] = campo.value;
+      });
+    });
+  }
+
+  function listaDoCampo(valor) {
+    return String(valor || "").split(/\s*[|;\n]\s*/).map(function (v) { return v.trim(); }).filter(Boolean).slice(0, 60);
+  }
+
+  /* ---------- leitura dos arquivos ---------- */
+  function processarArquivoImportacao(arquivo) {
+    if (!arquivo) return;
+    var csv = window.IMPORTAR_CSV;
+    var nome = String(arquivo.name || "").toLowerCase();
+    if (/\.pdf$/.test(nome) || arquivo.type === "application/pdf") { processarPdfCronograma(arquivo); return; }
+    if (csv && csv.pareceCsv(arquivo)) { processarCsvImportacao(arquivo); return; }
+    estadoImportacao("Formato não suportado. Envie um PDF de cronograma ou uma planilha CSV/TSV (no Excel: Salvar como → CSV UTF-8).", "err");
+  }
+
+  async function processarPdfCronograma(arquivo) {
+    if (!arquivo) return;
+    limparPreviasImportacao();
+    pdfImport = { arquivo: arquivo.name || "cronograma.pdf", linhas: [], texto: "", paginas: 0, carregando: true, fonte: "PDF" };
+    atualizarRodapeImportacao("cronograma");
+    $("#scheduleChooseFile").disabled = true;
+    estadoImportacao("Lendo “" + pdfImport.arquivo + "”… o arquivo permanece neste dispositivo.", "");
+    try {
+      if (!window.CRONOGRAMA_PDF) throw new Error("O leitor de PDF não carregou. Atualize a página e tente novamente.");
+      var extraido = await window.CRONOGRAMA_PDF.lerPdf(arquivo);
+      pdfImport.paginas = extraido.paginas;
+      pdfImport.texto = extraido.texto || "";
+      $("#scheduleRawLabel").textContent = "Ver texto extraído do PDF (para conferir a leitura)";
+      if (!pdfImport.texto.trim()) {
+        $("#schedulePreviewArea").style.display = "";
+        $("#scheduleRawText").textContent = "Nenhum texto foi encontrado. Este arquivo provavelmente é uma digitalização. É necessário aplicar OCR ao PDF antes de importar.";
+        estadoImportacao("Não encontrei texto pesquisável no PDF. Se ele foi digitalizado como imagem, aplique OCR e envie novamente.", "err");
+        return;
+      }
+      pdfImport.linhas = window.CRONOGRAMA_PDF.interpretarLinhas(extraido.linhas, db.empresas);
+      $("#schedulePreviewArea").style.display = "";
+      $("#scheduleRawText").textContent = pdfImport.texto;
+      renderTabelaCronograma();
+      var avisoLimite = extraido.linhas.length > window.CRONOGRAMA_PDF.maxLinhas ? " A prévia foi limitada a " + window.CRONOGRAMA_PDF.maxLinhas + " linhas." : "";
+      if (pdfImport.linhas.length) {
+        estadoImportacao("PDF lido: " + pdfImport.paginas + " página(s). Revise a empresa, a atividade e o status em cada linha antes de aplicar." + avisoLimite, "ok");
+      } else {
+        estadoImportacao("Extraí texto de " + pdfImport.paginas + " página(s), mas não reconheci linhas de atividade automaticamente. Adicione linhas manualmente ou envie este PDF para ajustarmos o leitor ao formato." + avisoLimite, "err");
+      }
+    } catch (erro) {
+      estadoImportacao(erro && erro.message ? erro.message : "Não foi possível ler o PDF.", "err");
+    } finally {
+      pdfImport.carregando = false;
+      $("#scheduleChooseFile").disabled = false;
+      atualizarResumoCronograma();
+    }
+  }
+
+  async function processarCsvImportacao(arquivo) {
+    if (!arquivo) return;
+    limparPreviasImportacao();
+    var nomeArquivo = arquivo.name || "planilha.csv";
+    $("#scheduleChooseFile").disabled = true;
+    estadoImportacao("Lendo “" + nomeArquivo + "”… o arquivo permanece neste dispositivo.", "");
+    try {
+      if (!window.IMPORTAR_CSV) throw new Error("O leitor de CSV não carregou. Atualize a página e tente novamente.");
+      var texto = await window.IMPORTAR_CSV.lerCsv(arquivo);
+      var analise = window.IMPORTAR_CSV.analisarTexto(texto, db.empresas);
+      csvImport = { arquivo: nomeArquivo, analise: analise, linhas: [], modo: "" };
+      $("#importModeWrap").style.display = "";
+      $("#importMode").value = analise.modo === "empresas" ? "empresas" : "cronograma";
+      aplicarModoCsv($("#importMode").value, true);
+    } catch (erro) {
+      estadoImportacao(erro && erro.message ? erro.message : "Não foi possível ler o CSV.", "err");
+    } finally {
+      $("#scheduleChooseFile").disabled = false;
+    }
+  }
+
+  function nomeDelimitador(d) {
+    return d === ";" ? "ponto e vírgula" : d === "," ? "vírgula" : d === "\t" ? "tabulação" : "barra vertical";
+  }
+
+  function resumoColunasCsv(analise) {
+    var rotulos = analise.colunas || {};
+    var reconhecidas = Object.keys(rotulos).map(function (campo) { return campo + " ← “" + rotulos[campo] + "”"; });
+    var ignoradas = (analise.cabecalho || []).filter(function (titulo) {
+      return titulo && reconhecidas.join(" | ").indexOf("“" + String(titulo).trim() + "”") < 0;
+    });
+    return "Arquivo: " + csvImport.arquivo + "\n" +
+      "Separador: " + nomeDelimitador(analise.delimitador) + " · " + analise.totalLinhas + " linha(s) de dados\n\n" +
+      "Colunas reconhecidas:\n" + (reconhecidas.length ? "  " + reconhecidas.join("\n  ") : "  (nenhuma — o arquivo foi lido como texto)") +
+      (ignoradas.length ? "\n\nColunas ignoradas:\n  " + ignoradas.join("\n  ") : "");
+  }
+
+  function aplicarModoCsv(modo, automatico) {
+    var analise = csvImport.analise;
+    if (!analise) return;
+    var csv = window.IMPORTAR_CSV;
+    var semCabecalho = !analise.comCabecalho;
+    csvImport.modo = modo;
+    atualizarRodapeImportacao(modo);
+    $("#importModeHint").textContent = csvImport.arquivo + " · separador " + nomeDelimitador(analise.delimitador) +
+      " · " + analise.totalLinhas + " linha(s) · " +
+      (analise.comCabecalho ? Object.keys(analise.colunas).length + " coluna(s) reconhecida(s)" : "sem cabeçalho reconhecido");
+
+    if (modo === "empresas") {
+      var mapaEmpresas = analise.comCabecalho ? analise.mapa : csv.inferirColunas(analise.tabela, "empresas");
+      csvImport.linhas = csv.interpretarEmpresas(analise.tabela, mapaEmpresas, db.empresas);
+      $("#schedulePreviewArea").style.display = "none";
+      $("#companyPreviewArea").style.display = "";
+      $("#companyRawText").textContent = resumoColunasCsv(analise) +
+        (semCabecalho ? "\n\nSem cabeçalho reconhecido: a 1ª coluna foi lida como empresa e as demais foram deduzidas pelo conteúdo." : "");
+      renderTabelaEmpresas();
+      var novas = csvImport.linhas.filter(function (r) { return !porId(r.empresaId); }).length;
+      if (!csvImport.linhas.length) {
+        estadoImportacao("Li o CSV (" + analise.totalLinhas + " linha(s)), mas não encontrei nomes de empresa. Confira se existe uma coluna “Empresa”.", "err");
+      } else {
+        estadoImportacao("CSV lido como carteira de empresas: " + csvImport.linhas.length + " linha(s), " + novas +
+          " para cadastrar e " + (csvImport.linhas.length - novas) + " já no relatório." +
+          (semCabecalho ? " Não reconheci um cabeçalho: a 1ª coluna virou o nome da empresa e as demais foram deduzidas pelo conteúdo." : "") +
+          " Campos em branco não apagam o que já existe — revise antes de aplicar.", "ok");
+      }
+      return;
+    }
+
+    pdfImport = { arquivo: csvImport.arquivo, linhas: [], texto: "", paginas: 0, carregando: false, fonte: "CSV" };
+    if (analise.comCabecalho) {
+      pdfImport.linhas = csv.interpretarCronograma(analise.tabela, analise.mapa, db.empresas);
+    } else if (window.CRONOGRAMA_PDF) {
+      // sem cabeçalho: cada linha vira texto e passa pelo mesmo interpretador do PDF
+      pdfImport.linhas = window.CRONOGRAMA_PDF.interpretarLinhas(analise.linhasTexto, db.empresas);
+    }
+    $("#companyPreviewArea").style.display = "none";
+    $("#schedulePreviewArea").style.display = "";
+    $("#scheduleRawLabel").textContent = "Ver as colunas reconhecidas no CSV";
+    $("#scheduleRawText").textContent = resumoColunasCsv(analise) +
+      (semCabecalho ? "\n\nSem cabeçalho reconhecido: as linhas foram interpretadas como texto (empresa, datas e status detectados pelo conteúdo)." : "");
+    renderTabelaCronograma();
+    var limite = analise.totalLinhas > csv.maxLinhas ? " A prévia foi limitada a " + csv.maxLinhas + " linhas." : "";
+    var aCadastrar = pdfImport.linhas.filter(function (r) { return r.empresaId === "__nova__"; }).length;
+    if (!pdfImport.linhas.length) {
+      estadoImportacao("Li o CSV (" + analise.totalLinhas + " linha(s)), mas não reconheci itens de cronograma. Confira o cabeçalho (Empresa, Atividade, Previsto, Status…) ou troque o modo acima." + limite, "err");
+    } else {
+      estadoImportacao("CSV lido como cronograma: " + pdfImport.linhas.length + " item(ns) em " + nomeDelimitador(analise.delimitador) + "." +
+        (semCabecalho ? " Não reconheci um cabeçalho: cada linha foi lida como texto, do mesmo jeito que o PDF." : "") +
+        (aCadastrar ? " " + aCadastrar + " linha(s) são de empresas ainda não cadastradas — elas serão criadas se continuarem marcadas." : "") +
+        " Revise a empresa, a atividade e o status antes de aplicar." + limite, "ok");
+    }
+    if (!automatico) toast("Modo de importação alterado.");
+  }
+
+  /* ---------- aplicar: cronograma ---------- */
   function statusAgregadoCronograma(linhas) {
     var estados = linhas.map(function (r) { return r.status; }).filter(function (s) { return !!STATUS[s] || s === "pendente"; });
     if (!estados.length) return "";
@@ -998,10 +1247,29 @@
     return Math.round(porcentagens.reduce(function (a, n) { return a + n; }, 0) / porcentagens.length);
   }
 
-  function aplicarCronogramaPdf() {
+  function aplicarCronogramaImportado() {
     atualizarLinhasDaPrevia();
-    var selecionadas = pdfImport.linhas.filter(function (r) { return r.usar && r.empresaId && String(r.atividade || "").trim() && porId(r.empresaId); });
-    if (!selecionadas.length) { toast("Selecione ao menos uma linha e associe a uma empresa."); return; }
+    var fonte = pdfImport.fonte === "CSV" ? "CSV" : "PDF";
+    var candidatas = pdfImport.linhas.filter(function (r) {
+      if (!r.usar || !String(r.atividade || "").trim()) return false;
+      return !!porId(r.empresaId) || (r.empresaId === "__nova__" && !!String(r.empresaCsv || "").trim());
+    });
+    if (!candidatas.length) { toast("Selecione ao menos uma linha e associe a uma empresa."); return; }
+
+    var criadas = 0, novasPorNome = {};
+    candidatas.forEach(function (linha) {
+      if (linha.empresaId !== "__nova__") return;
+      var nome = String(linha.empresaCsv || "").trim();
+      var k = chaveNome(nome);
+      if (!novasPorNome[k]) {
+        novasPorNome[k] = criarEmpresaDoImport(nome, null, "Cadastrada pela importação de cronograma (" + fonte + ")");
+        criadas++;
+      }
+      linha.empresaId = novasPorNome[k].id;
+      linha.empresaNome = novasPorNome[k].nome;
+    });
+
+    var selecionadas = candidatas.filter(function (r) { return !!porId(r.empresaId); });
     var porEmpresa = {};
     selecionadas.forEach(function (linha) {
       if (!porEmpresa[linha.empresaId]) porEmpresa[linha.empresaId] = [];
@@ -1013,7 +1281,7 @@
       if (!empresa) return;
       empresa.cronograma = linhas.map(function (linha, i) {
         return {
-          id: linha.id || ("pdf-" + dataAtual + "-" + i),
+          id: linha.id || ("import-" + dataAtual + "-" + i),
           atividade: linha.atividade.trim() || "Item do cronograma",
           fase: String(linha.fase || "").trim(),
           data: linha.data || "",
@@ -1033,7 +1301,7 @@
       var concluidas = linhas.filter(function (r) { return r.status === "concluido"; }).length;
       var pendentes = linhas.filter(function (r) { return r.status === "pendente"; }).length;
       var temStatusReconhecido = linhas.some(function (r) { return !!STATUS[r.status] || r.status === "pendente"; });
-      var resumo = "Cronograma atualizado via PDF em " + br(dataAtual) + ": " + linhas.length + " item(ns), " + concluidas + " concluído(s), " + pendentes + " pendente(s).";
+      var resumo = "Cronograma atualizado via " + fonte + " em " + br(dataAtual) + ": " + linhas.length + " item(ns), " + concluidas + " concluído(s), " + pendentes + " pendente(s).";
       var mudouStatus = !!novoStatus && empresa.status !== novoStatus;
       var mudouProgresso = novoProgresso != null && empresa.progresso !== novoProgresso;
       if (novoStatus) empresa.status = novoStatus;
@@ -1045,7 +1313,7 @@
         data: dataAtual,
         progresso: empresa.progresso,
         status: empresa.status,
-        texto: (mudouStatus || mudouProgresso ? "Atualizado via cronograma: " : "Cronograma importado: ") +
+        texto: (mudouStatus || mudouProgresso ? "Atualizado via cronograma (" + fonte + "): " : "Cronograma importado (" + fonte + "): ") +
           linhas.length + " item(ns), " + concluidas + " concluído(s)."
       });
       empresa.historico = empresa.historico.slice(0, 30);
@@ -1057,9 +1325,78 @@
     if (!salvar()) return;
     fecharImportadorCronograma();
     renderTudo();
-    toast(atualizadas + " empresa(s) atualizada(s) pelo cronograma" + (dadosStatusDetectados ? " · status/progresso conferidos" : " · o PDF não trouxe status reconhecível"));
+    toast(atualizadas + " empresa(s) atualizada(s) pelo cronograma" + (criadas ? " · " + criadas + " cadastrada(s)" : "") +
+      (dadosStatusDetectados ? " · status/progresso conferidos" : " · o arquivo não trouxe status reconhecível"));
   }
 
+  /* ---------- aplicar: carteira de empresas ---------- */
+  function mesclarLista(atual, novos, modo) {
+    if (!novos || !novos.length) return atual;
+    if (modo === "substituir") return novos.slice(0, 60);
+    var vistos = {};
+    atual.forEach(function (v) { vistos[chaveTexto(v)] = true; });
+    novos.forEach(function (v) {
+      var k = chaveTexto(v);
+      if (k && !vistos[k]) { vistos[k] = true; atual.push(v); }
+    });
+    return atual.slice(0, 60);
+  }
+
+  function aplicarEmpresasCsv() {
+    atualizarLinhasEmpresasDaPrevia();
+    var modoListas = $("#companyListMode").value === "substituir" ? "substituir" : "acrescentar";
+    var selecionadas = csvImport.linhas.filter(function (r) { return r.usar && (porId(r.empresaId) || String(r.nome || "").trim()); });
+    if (!selecionadas.length) { toast("Selecione ao menos uma linha com nome de empresa."); return; }
+
+    var dataAtual = hoje(), criadas = 0, atualizadas = 0, criadasPorNome = {};
+    selecionadas.forEach(function (linha) {
+      var alvo = porId(linha.empresaId);
+      var nome = String(linha.nome || "").trim();
+      // duas linhas da mesma empresa nova viram uma empresa só
+      if (!alvo && nome) alvo = criadasPorNome[chaveNome(nome)] || null;
+      var dataLinha = linha.atualizado || dataAtual;
+      if (!alvo) {
+        criadasPorNome[chaveNome(nome)] = criarEmpresaDoImport(nome, {
+          tipo: linha.tipo, status: linha.status, progresso: linha.progresso,
+          statusText: linha.statusText, feito: linha.feito, falta: linha.falta,
+          grupo: linha.grupo, observacao: linha.observacao, atualizado: dataLinha
+        }, "Cadastrada pela planilha " + csvImport.arquivo);
+        criadas++;
+        return;
+      }
+      var mudou = [];
+      if (String(linha.tipo || "").trim() && linha.tipo !== alvo.tipo) { alvo.tipo = String(linha.tipo).trim().slice(0, 80); mudou.push("tipo"); }
+      if (STATUS[linha.status] && linha.status !== alvo.status) { alvo.status = linha.status; mudou.push("status"); }
+      if (linha.progresso != null && clamp(num(linha.progresso, 0), 0, 100) !== alvo.progresso) { alvo.progresso = clamp(num(linha.progresso, 0), 0, 100); mudou.push("progresso"); }
+      if (String(linha.statusText || "").trim()) { alvo.statusText = String(linha.statusText).trim(); mudou.push("status atual"); }
+      if (String(linha.observacao || "").trim()) alvo.observacao = String(linha.observacao).trim();
+      var antesItens = alvo.feito.length + alvo.falta.length + alvo.grupo.length;
+      alvo.feito = mesclarLista(alvo.feito, linha.feito, modoListas);
+      alvo.falta = mesclarLista(alvo.falta, linha.falta, modoListas);
+      alvo.grupo = mesclarLista(alvo.grupo, linha.grupo, modoListas);
+      var deltaItens = alvo.feito.length + alvo.falta.length + alvo.grupo.length - antesItens;
+      if (deltaItens) mudou.push(Math.abs(deltaItens) + " item(ns)");
+      alvo.atualizado = dataLinha;
+      alvo.historico = alvo.historico || [];
+      alvo.historico.unshift({
+        data: dataLinha, progresso: alvo.progresso, status: alvo.status,
+        texto: ("Atualizada por CSV: " + (mudou.length ? mudou.join(", ") : "sem mudanças de campo")).slice(0, 90)
+      });
+      alvo.historico = alvo.historico.slice(0, 30);
+      tocados[alvo.id] = true;
+      atualizadas++;
+    });
+
+    db.data = dataAtual;
+    if (!salvar()) return;
+    fecharImportadorCronograma();
+    ui.sort = "origem";
+    renderTudo();
+    toast(criadas + " empresa(s) cadastrada(s) · " + atualizadas + " atualizada(s) pelo CSV" +
+      (sync.ativo() ? " — enviando para a equipe…" : ""));
+  }
+
+  /* ---------- eventos do importador ---------- */
   $("#btnScheduleImport").onclick = abrirImportadorCronograma;
   $("#mImportSchedule").onclick = function () { $("#menu").classList.remove("open"); abrirImportadorCronograma(); };
   $("#closeSchedule").onclick = fecharImportadorCronograma;
@@ -1069,10 +1406,23 @@
   $("#scheduleFileInput").onchange = function () {
     var arquivo = this.files && this.files[0];
     this.value = "";
-    processarPdfCronograma(arquivo);
+    processarArquivoImportacao(arquivo);
   };
   $("#scheduleAddRow").onclick = adicionarLinhaCronogramaManual;
-  $("#scheduleApply").onclick = aplicarCronogramaPdf;
+  $("#scheduleApply").onclick = function () {
+    if (modoImportacaoAtual() === "empresas") aplicarEmpresasCsv();
+    else aplicarCronogramaImportado();
+  };
+  $("#importMode").onchange = function () { aplicarModoCsv(this.value, false); };
+  $("#companyListMode").onchange = function () { atualizarResumoEmpresas(); };
+  $("#scheduleModelSchedule").onclick = function () {
+    baixar("modelo-cronograma.csv", "\uFEFF" + window.IMPORTAR_CSV.modeloCronograma, "text/csv;charset=utf-8");
+    toast("Modelo de cronograma em CSV baixado.");
+  };
+  $("#scheduleModelCompanies").onclick = function () {
+    baixar("modelo-empresas.csv", "\uFEFF" + window.IMPORTAR_CSV.modeloEmpresas, "text/csv;charset=utf-8");
+    toast("Modelo de carteira em CSV baixado.");
+  };
   $("#schedulePreview").onchange = function (ev) {
     var linha = ev.target.closest("tr[data-pdf-row]");
     if (!linha) return;
@@ -1084,8 +1434,8 @@
     else item[campo] = ev.target.value;
     if (campo === "empresaId") {
       var empresa = porId(item.empresaId);
-      item.empresaNome = empresa ? empresa.nome : "";
-      if (empresa) item.usar = true;
+      item.empresaNome = empresa ? empresa.nome : (item.empresaId === "__nova__" ? String(item.empresaCsv || "") : "");
+      if (empresa || item.empresaId === "__nova__") item.usar = true;
     }
     if (campo === "empresaId" || campo === "usar") {
       var check = $("input[data-field=usar]", linha);
@@ -1099,13 +1449,45 @@
     var item = pdfImport.linhas[num(linha.dataset.pdfRow, -1)];
     if (item) item.atividade = ev.target.value;
   };
+  $("#companyPreview").onchange = function (ev) {
+    var linha = ev.target.closest("tr[data-company-row]");
+    if (!linha) return;
+    var item = csvImport.linhas[num(linha.dataset.companyRow, -1)];
+    if (!item) return;
+    var campo = ev.target.dataset.field;
+    if (campo === "usar") item.usar = ev.target.checked;
+    else if (campo === "progresso") item.progresso = ev.target.value === "" ? null : clamp(num(ev.target.value, 0), 0, 100);
+    else if (campo === "feito" || campo === "falta") item[campo] = listaDoCampo(ev.target.value);
+    else if (campo !== "nome") item[campo] = ev.target.value;
+    if (campo === "empresaId") {
+      var alvo = porId(item.empresaId);
+      var inputNome = $("input[data-field=nome]", linha);
+      if (inputNome) {
+        inputNome.disabled = !!alvo;
+        inputNome.value = alvo ? alvo.nome : (item.empresaCsv || item.nome);
+      }
+      if (!alvo) item.nome = item.empresaCsv || item.nome;
+      item.usar = true;
+      var check = $("input[data-field=usar]", linha);
+      if (check) check.checked = true;
+    }
+    atualizarResumoEmpresas();
+  };
+  $("#companyPreview").oninput = function (ev) {
+    var linha = ev.target.closest("tr[data-company-row]");
+    if (!linha) return;
+    var item = csvImport.linhas[num(linha.dataset.companyRow, -1)];
+    var campo = ev.target.dataset.field;
+    if (!item || ev.target.disabled) return;
+    if (campo === "nome" || campo === "statusText" || campo === "tipo") item[campo] = ev.target.value;
+  };
   var scheduleDrop = $("#scheduleDrop");
   scheduleDrop.addEventListener("dragover", function (e) { e.preventDefault(); scheduleDrop.classList.add("drag"); });
   scheduleDrop.addEventListener("dragleave", function () { scheduleDrop.classList.remove("drag"); });
   scheduleDrop.addEventListener("drop", function (e) {
     e.preventDefault(); scheduleDrop.classList.remove("drag");
     var arquivo = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (arquivo) processarPdfCronograma(arquivo);
+    if (arquivo) processarArquivoImportacao(arquivo);
   });
 
   $("#mReset").onclick = function () {
