@@ -14,7 +14,7 @@
    políticas permitem.
    ===================================================================== */
 window.SYNC_CONFIG = {
-  url: "https://relatorioimplant.vercel.app/",                     // ex.: "https://abcdefghijmnop.supabase.co"
+  url: "https://dlnfuvhlkgnzesrnqgfd.supabase.co",                     // ex.: "https://abcdefghijmnop.supabase.co"
   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsbmZ1dmhsa2duemVzcm5xZ2ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NDQ4MjcsImV4cCI6MjEwNzEyMDgyN30.ew9xsAmQcBXtsPt93dz5yPY7AXtBT3WfM67WTaVjCzo",                 // ex.: "eyJhbGciOiJIUzI1NiIs..." (longa, começa com eyJ)
   table: "documentos",        // nome da tabela criada pelo supabase.sql
   schema: "public"
