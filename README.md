@@ -149,14 +149,43 @@ reconhecidas”* mostra coluna por coluna.
 > Dica: no Excel, **Salvar como → CSV UTF-8 (delimitado por vírgulas)**; no
 > Google Planilhas, **Arquivo → Fazer o download → .csv**. Os dois funcionam.
 
-### Relatórios complementares
+### Painel de relatórios
 
-A seção **Relatórios complementares** apresenta a distribuição da carteira por
-faixa de progresso, as empresas com mais pendências e os próximos itens/prazos
-(avisando quando estiverem vencidos). Ela também oferece exportação CSV da
-carteira, das pendências e da agenda/visitas para abrir no Excel ou similar —
-e esses mesmos arquivos podem ser editados e **reimportados** pelo importador
-de CSV.
+Logo abaixo dos gráficos fica **um painel só**, com abas. Ele substitui os três
+cards soltos de antes: nada fica espalhado pela tela e, se quiser enxugar mais,
+o botão **▾** recolhe o painel inteiro (o resumo da aba continua visível no
+cabeçalho — e o estado fica salvo no navegador).
+
+| Aba | O que mostra |
+| --- | --- |
+| **Resumo** | saúde da carteira: métricas, fatia por situação, empresas que precisam de atenção (risco + atraso + tempo parado) e próximos compromissos |
+| **Carteira** | tabela completa e ordenável (empresa, status, progresso, concluídos, em aberto, agenda, atualização) |
+| **Pendências** | tudo o que está em aberto, agrupado por empresa, com origem (pendência registrada, etapa ou visita) e vencidos marcados |
+| **Agenda** | linha do tempo: vencidos → hoje → 7 dias → 30 dias → concluídos → sem data |
+| **Fases** | funil da matriz: quanto de cada etapa já foi concluído e em quem ainda está pendente |
+| **Responsáveis** | carga de cada pessoa (em aberto, vencidos, visitas, concluídos) |
+| **Evolução** | faixas de progresso, há quanto tempo cada empresa não atualiza e últimas movimentações do histórico |
+
+O que dá para fazer dentro do painel:
+
+- **Filtrar** cada relatório por busca, status, tipo, origem, período
+  (só vencidos / 7 dias / 30 dias / concluídos / sem data), tipo de item
+  (etapas ou visitas) e responsável — sem mexer nos filtros da tela
+- **Seguir filtros da tela**: ligando essa opção, o painel respeita o status,
+  o tipo e a busca que você marcou em cima
+- **Ordenar** a tabela da carteira clicando no título de qualquer coluna
+- **Ver todos / Mostrar menos**: cada lista vem resumida e abre por inteiro
+- **↓ CSV**: baixa **exatamente o que está na tela** (com os filtros
+  aplicados) — carteira, pendências, agenda, matriz de fases, carga por
+  responsável, evolução ou resumo. Os arquivos de carteira, pendências e
+  agenda/visitas voltam a entrar sem ajuste pelo importador de CSV
+- **⧉ Copiar**: copia o resumo do relatório em texto, pronto para colar no
+  WhatsApp, e-mail ou planilha
+- **⎙ Imprimir**: imprime **todos** os relatórios de uma vez, completos (sem
+  os botões e filtros), em páginas separadas por aba
+- **Drill-down**: clique no nome de uma empresa para abrir a ficha completa, no
+  **✎** para editar, numa fatia do gráfico para filtrar por aquele status e no
+  nome de um responsável para filtrar o painel por ele
 
 ## Onde os dados ficam salvos
 

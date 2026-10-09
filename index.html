@@ -143,30 +143,165 @@ label.f{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:0
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:13px}
 .legend i{font-style:normal;font-weight:700;margin-right:5px}
 
-/* ---------- relatórios complementares ---------- */
-.report-top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
-.report-top h2{margin:0;font-size:14px;font-weight:650}
-.report-top p{margin:3px 0 0;font-size:12px;color:var(--muted)}
-.report-actions{display:flex;gap:7px;flex-wrap:wrap}
-.report-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px}
-.report-grid .card{min-width:0}
-.report-grid .sub{margin-bottom:12px}
-.report-bar{display:flex;align-items:center;gap:9px;margin:9px 0;font-size:12px}
-.report-bar .label{width:68px;flex:none;color:var(--muted)}
-.report-bar .bar-track{height:7px}
-.report-bar .value{width:30px;text-align:right;font-weight:650;font-variant-numeric:tabular-nums}
-.report-list{display:flex;flex-direction:column;gap:7px}
-.report-row{display:flex;align-items:flex-start;justify-content:space-between;gap:9px;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
-.report-row button.report-company{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:none;padding:0;text-align:left;color:var(--txt);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
-.report-row button.report-company:hover{color:var(--accent);text-decoration:underline}
-.report-row .report-meta{font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
-.report-row .report-count{font-size:11px;font-weight:650;white-space:nowrap;color:var(--wait)}
-.report-row .report-date{flex:none;text-align:right;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* ---------- painel de relatórios ---------- */
 .report-badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:99px;padding:1px 7px;font-size:10px;font-weight:650;color:var(--muted);white-space:nowrap}
 .report-badge.visita{color:var(--dev);border-color:color-mix(in srgb,var(--dev) 32%,var(--line));background:color-mix(in srgb,var(--dev) 8%,transparent)}
 .report-badge.atrasado{color:var(--risk);border-color:color-mix(in srgb,var(--risk) 32%,var(--line));background:color-mix(in srgb,var(--risk) 8%,transparent)}
-.report-actions .btn{height:30px;font-size:11.5px}
-.report-note{font-size:11.5px;color:var(--faint);margin:10px 0 0}
+.report-badge.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 32%,var(--line));background:color-mix(in srgb,var(--ok) 8%,transparent)}
+
+.rp{border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.rp-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  padding:12px 15px;border-bottom:1px solid var(--line);background:var(--surface2)}
+.rp-head h2{margin:0;font-size:13.5px;font-weight:650;letter-spacing:-.1px}
+.rp-sub{margin:2px 0 0;font-size:11.5px;color:var(--muted)}
+.rp-tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rp-tools .btn{height:29px;font-size:11.5px}
+.rp-tools #btnReportToggle{width:32px;padding:0;font-size:13px;color:var(--muted)}
+.rp-check{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);cursor:pointer;user-select:none;white-space:nowrap}
+.rp-check input{width:14px;height:14px;accent-color:var(--accent);margin:0}
+.rp.fechado .rp-body{display:none}
+
+.rp-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:10px 15px;border-bottom:1px solid var(--line);background:var(--surface)}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:99px;
+  border:1px solid var(--line);background:var(--surface);color:var(--muted);font-family:inherit;font-size:12.5px;
+  font-weight:500;cursor:pointer;transition:.14s;white-space:nowrap}
+.rp-tab:hover{border-color:var(--line2);color:var(--txt)}
+.rp-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+html[data-theme="dark"] .rp-tab.on{color:#0c0c0f}
+.rp-tab .n{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--surface2);
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.rp-tab.on .n{background:rgba(255,255,255,.22);color:#fff}
+html[data-theme="dark"] .rp-tab.on .n{background:rgba(0,0,0,.18);color:#0c0c0f}
+.rp-tab.alerta .n{background:color-mix(in srgb,var(--risk) 14%,transparent);color:var(--risk)}
+.rp-tab.on.alerta .n{background:rgba(255,255,255,.22);color:#fff}
+html[data-theme="dark"] .rp-tab.on.alerta .n{color:#0c0c0f}
+
+.rp-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px 15px;border-bottom:1px solid var(--line)}
+.rp-filters:empty{display:none}
+.rp-filters input[type=text]{width:210px;height:30px;padding:0 10px;font-size:12.5px}
+.rp-filters select{width:auto;min-width:126px;height:30px;padding:0 8px;font-size:12.5px;border-radius:8px}
+.rp-filters .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--faint);font-weight:600}
+.rp-filters .btn{height:30px;font-size:11.5px}
+.rp-chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rp-chip{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:3px 5px 3px 9px;border-radius:99px;
+  border:1px solid var(--line);background:var(--surface2);color:var(--muted)}
+.rp-chip button{border:0;background:none;color:var(--faint);cursor:pointer;font-size:13px;line-height:1;padding:0 3px;border-radius:50%}
+.rp-chip button:hover{color:var(--risk)}
+
+.rp-stage{padding:15px}
+.rp-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:9px 15px;border-top:1px solid var(--line);background:var(--surface2);font-size:11.5px;color:var(--faint)}
+
+/* peças usadas dentro das abas */
+.rp-metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:9px}
+.rp-metric{border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--surface2)}
+.rp-metric .v{font-size:19px;font-weight:650;letter-spacing:-.4px;line-height:1.15;font-variant-numeric:tabular-nums}
+.rp-metric .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:3px}
+.rp-metric .d{font-size:10.5px;color:var(--faint);margin-top:2px}
+.rp-block{margin-top:17px}
+.rp-block:first-child{margin-top:0}
+.rp-block>h3{margin:0 0 9px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:650;
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rp-block>h3 small{text-transform:none;letter-spacing:0;font-weight:400;color:var(--faint)}
+.rp-2col{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.rp-empty{font-size:12.5px;color:var(--faint);font-style:italic;margin:0}
+.rp-note{font-size:11.5px;color:var(--faint);margin:10px 0 0}
+
+.rp-stack{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--surface2);border:1px solid var(--line)}
+.rp-stack i{display:block;height:100%}
+.rp-legend{display:flex;gap:13px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--muted)}
+.rp-legend button{display:inline-flex;align-items:center;gap:5px;background:none;border:0;padding:2px 4px;margin:-2px -4px;
+  border-radius:6px;font:inherit;font-size:11.5px;color:var(--muted);cursor:pointer}
+.rp-legend button:hover{background:var(--surface2);color:var(--txt)}
+.rp-legend i{width:8px;height:8px;border-radius:3px;display:inline-block;flex:none}
+.rp-legend b{color:var(--txt);font-variant-numeric:tabular-nums}
+
+.rp-table-wrap{border:1px solid var(--line);border-radius:9px;overflow:auto;max-height:56vh}
+table.rp-table{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+table.rp-table th{position:sticky;top:0;z-index:1;background:var(--surface2);text-align:left;font-size:10px;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:650;padding:8px 10px;
+  border-bottom:1px solid var(--line);white-space:nowrap;cursor:pointer;user-select:none}
+table.rp-table th:hover{color:var(--txt)}
+table.rp-table th.num{text-align:right}
+table.rp-table th.ord{color:var(--accent)}
+table.rp-table th.ord:after{content:"↓";margin-left:4px}
+table.rp-table th.ord.asc:after{content:"↑"}
+table.rp-table td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.rp-table tbody tr:last-child td{border-bottom:0}
+table.rp-table tbody tr:hover{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+table.rp-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.rp-table td.acao{text-align:right;white-space:nowrap}
+.rp-link{background:none;border:0;padding:0;color:var(--txt);font-family:inherit;font-size:12.5px;font-weight:600;
+  text-align:left;cursor:pointer;overflow-wrap:anywhere}
+.rp-link:hover{color:var(--accent);text-decoration:underline}
+.rp-muted{font-size:10.5px;color:var(--faint);display:block;font-weight:400}
+.rp-prog{display:flex;align-items:center;gap:7px;min-width:116px}
+.rp-prog .track{flex:1;height:6px}
+.rp-prog b{font-size:11.5px;font-variant-numeric:tabular-nums;width:32px;text-align:right;flex:none}
+
+.rp-rows{display:flex;flex-direction:column;gap:7px}
+.rp-row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;padding:8px 10px;
+  border:1px solid var(--line);border-radius:9px;background:var(--surface2)}
+.rp-row .main{min-width:0;flex:1}
+.rp-row .meta{font-size:11px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.rp-row .side{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none;text-align:right}
+.rp-count{font-size:11px;font-weight:650;color:var(--wait);white-space:nowrap;font-variant-numeric:tabular-nums}
+.rp-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+
+.rp-group{border:1px solid var(--line);border-radius:9px;background:var(--surface2);overflow:hidden}
+.rp-group+.rp-group{margin-top:7px}
+.rp-group>summary{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;list-style:none}
+.rp-group>summary::-webkit-details-marker{display:none}
+.rp-group>summary:hover{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.rp-group .g-nome{font-weight:600;font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rp-group .g-body{padding:2px 11px 10px;border-top:1px solid var(--line);background:var(--surface)}
+.rp-item{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12px;line-height:1.45}
+.rp-item:last-child{border-bottom:0}
+.rp-item .dot{width:6px;height:6px;border-radius:50%;background:var(--wait);flex:none;margin-top:6px}
+.rp-item.visita .dot{background:var(--dev)}
+.rp-item.falta .dot{background:var(--risk)}
+.rp-item .txt{min-width:0;flex:1;overflow-wrap:anywhere}
+.rp-item .qdo{flex:none;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right}
+
+.rp-tl-group{margin-bottom:15px}
+.rp-tl-group:last-child{margin-bottom:0}
+.rp-tl-head{display:flex;align-items:center;gap:8px;margin:0 0 7px;font-size:10.5px;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--muted);font-weight:650}
+.rp-tl-head .n{font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;background:var(--surface2);
+  border:1px solid var(--line);color:var(--muted)}
+.rp-tl-head.critico .n{color:var(--risk);border-color:color-mix(in srgb,var(--risk) 30%,var(--line));
+  background:color-mix(in srgb,var(--risk) 8%,transparent)}
+.rp-tl-items{display:flex;flex-direction:column;gap:6px}
+.rp-ev{display:flex;gap:11px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);
+  border-left:3px solid var(--c,var(--line2));border-radius:8px;background:var(--surface2)}
+.rp-ev .side{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.rp-ev .data{flex:none;width:72px}
+.rp-ev .data b{display:block;font-size:12px;font-weight:650;font-variant-numeric:tabular-nums}
+.rp-ev .data small{font-size:10px;color:var(--faint);text-transform:capitalize}
+.rp-ev .main{min-width:0;flex:1}
+
+.rp-funnel{display:flex;flex-direction:column;gap:10px}
+.rp-fase{display:grid;grid-template-columns:158px 1fr 128px;gap:11px;align-items:center}
+.rp-fase .nome{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px;min-width:0}
+.rp-fase .nome .i{width:auto;min-width:18px;height:18px;padding:0 5px;border-radius:6px;flex:none;display:flex;align-items:center;
+  justify-content:center;font-size:10px;font-weight:700;background:var(--surface2);color:var(--muted)}
+.rp-fase .val{font-size:11px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.rp-fase .val b{color:var(--txt)}
+.rp-fase .quem{grid-column:2/-1;font-size:11px;color:var(--faint);margin-top:-4px;overflow-wrap:anywhere}
+
+.rp-more{margin-top:12px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap}
+
+/* ---------- impressão de todos os relatórios ---------- */
+#reportPrintAll{display:none}
+body.print-all>.wrap,body.print-all>#toast,body.print-all>#fileInput{display:none!important}
+body.print-all #reportPrintAll{display:block;max-width:1100px;margin:0 auto}
+.print-rep{margin:0 0 22px;break-inside:avoid;page-break-inside:avoid}
+.print-rep h2{font-size:15px;margin:0 0 2px;font-weight:650}
+.print-rep .sub{font-size:11px;color:#555;margin:0 0 8px}
+.print-rep .rp-table-wrap{max-height:none;overflow:visible;border:0}
+.print-rep table.rp-table th{position:static;background:#f1f1f3}
+.print-rep .rp-group>summary{padding:6px 0}
+.print-rep .rp-group .g-body{padding:0}
 
 /* ============================================================
    FILTROS
@@ -373,18 +508,32 @@ body.focus .stage{display:block}
   .cols{grid-template-columns:1fr}
   .fgrid{grid-template-columns:1fr}
   .search input{width:150px}
+  .rp-2col{grid-template-columns:1fr}
 }
 @media (max-width:620px){
   .wrap{padding:24px 14px 60px}
   .kpi{border-right:0;border-bottom:1px solid var(--line)}
   .prow{grid-template-columns:1fr;gap:4px}
   .stage .big{padding:20px}
+  .rp-fase{grid-template-columns:1fr}
+  .rp-fase .val{text-align:left}
+  .rp-fase .quem{grid-column:1/-1}
+  .rp-filters input[type=text]{width:100%}
+  .rp-head{align-items:flex-start}
 }
 @media print{
   body{background:#fff}
-  .tools,.filters,.footer,.stage,.co .edit,.menu,.x,.modal .foot,#toast,.report-actions{display:none!important}
+  .tools,.filters,.footer,.stage,.co .edit,.menu,.x,.modal .foot,#toast,
+  .rp-tools,.rp-tabs,.rp-filters,.rp-more,.rp-check,.rp-foot{display:none!important}
+  .rp-stage{padding:0}
+  .rp-table-wrap{max-height:none;overflow:visible;border:0}
+  table.rp-table th{position:static}
   .backdrop{display:none!important}
   .card,.co,.kpi,.modal{border-color:#ddd!important;box-shadow:none!important;background:#fff!important}
+  .rp{border-color:#ddd!important;background:#fff!important}
+  .rp-head{background:#fff!important;border-bottom-color:#ddd!important}
+  .rp-metric,.rp-row,.rp-ev,.rp-group,.rp-item{background:#fff!important}
+  .print-rep{break-inside:avoid;page-break-inside:avoid}
   .grid{grid-template-columns:1fr 1fr}
   .co .st{display:block;-webkit-line-clamp:unset;overflow:visible}
   .matrix{min-width:0}
@@ -452,37 +601,33 @@ body.focus .stage{display:block}
     </div>
   </section>
 
-  <!-- ==================== RELATÓRIOS COMPLEMENTARES ==================== -->
+  <!-- ==================== PAINEL DE RELATÓRIOS ==================== -->
   <section id="reports">
-    <div class="report-top">
-      <div>
-        <h2>Relatórios complementares</h2>
-        <p>Progresso, principais pendências e agenda/visitas importadas do cronograma.</p>
+    <div class="rp" id="reportPanel">
+      <div class="rp-head">
+        <div>
+          <h2>Relatórios</h2>
+          <p class="rp-sub" id="reportHeadSub"></p>
+        </div>
+        <div class="rp-tools">
+          <label class="rp-check" title="Aplica aqui os mesmos filtros da tela (status, tipo e busca)">
+            <input type="checkbox" id="reportFollow">Seguir filtros da tela
+          </label>
+          <button class="btn sm" id="btnReportCopy" title="Copiar o resumo deste relatório como texto">⧉ Copiar</button>
+          <button class="btn sm" id="btnReportCsv" title="Baixar em CSV exatamente o que está neste relatório">↓ CSV</button>
+          <button class="btn sm" id="btnReportPrint" title="Imprimir todos os relatórios de uma vez">⎙ Imprimir</button>
+          <button class="btn sm" id="btnReportToggle" title="Recolher painel" aria-expanded="true" aria-controls="reportBody">▾</button>
+        </div>
       </div>
-      <div class="report-actions">
-        <button class="btn" id="btnReportPortfolio">↓ Carteira CSV</button>
-        <button class="btn" id="btnReportPendencias">↓ Pendências CSV</button>
-        <button class="btn" id="btnReportAgenda">↓ Agenda e visitas CSV</button>
-      </div>
-    </div>
-    <div class="report-grid">
-      <div class="card">
-        <h2>Carteiras por progresso</h2>
-        <p class="sub">Faixas de conclusão do conjunto de implantações</p>
-        <div id="progressReport"></div>
-      </div>
-      <div class="card">
-        <h2>Maiores pendências</h2>
-        <p class="sub">Empresas com mais itens em aberto registrados</p>
-        <div id="priorityReport"></div>
-      </div>
-      <div class="card">
-        <h2>Agenda, visitas e prazos</h2>
-        <p class="sub">Próximos itens importados do PDF e prazos vencidos</p>
-        <div id="agendaReport"></div>
+      <div class="rp-body" id="reportBody">
+        <nav class="rp-tabs" id="reportTabs" role="tablist" aria-label="Relatórios disponíveis"></nav>
+        <div class="rp-filters" id="reportFilters"></div>
+        <div class="rp-stage" id="reportStage"></div>
+        <div class="rp-foot" id="reportFoot"></div>
       </div>
     </div>
   </section>
+  <div id="reportPrintAll" aria-hidden="true"></div>
 
   <!-- ==================== MATRIZ ==================== -->
   <section class="card">
