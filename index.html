@@ -627,7 +627,12 @@ body.focus .stage{display:block}
       </div>
       <div id="schedulePreviewArea" style="display:none">
         <div class="import-summary" id="scheduleSummary"></div>
-        <div style="display:flex;justify-content:flex-end;margin:4px 0 8px">
+        <div class="import-actions" id="scheduleLinkBar" style="justify-content:space-between">
+          <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+            <label for="scheduleLinkCompany">Vincular todas as atividades a</label>
+            <select id="scheduleLinkCompany" aria-label="Empresa cadastrada para vincular todas as atividades"></select>
+            <button type="button" class="btn sm" id="scheduleLinkApply">Vincular todas</button>
+          </div>
           <button type="button" class="btn sm" id="scheduleAddRow">+ Adicionar linha manual</button>
         </div>
         <div class="table-wrap">

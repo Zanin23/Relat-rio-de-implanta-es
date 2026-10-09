@@ -71,6 +71,10 @@ Use **⬆ Importar PDF/CSV** no topo (ou **Dados ▾ → Importar cronograma ou 
    enviado ao Supabase nem a outro servidor.
 2. Confira e edite a prévia. As linhas não reconhecidas podem ser ajustadas,
    associadas manualmente a uma empresa, desmarcadas ou adicionadas à mão.
+   Se o arquivo inteiro pertence a uma só empresa, use a barra
+   **“Vincular todas as atividades a”**: escolha uma empresa já cadastrada e
+   clique **Vincular todas** — todas as linhas da prévia passam a apontar para
+   ela (as que têm atividade são marcadas para importar).
 3. Clique **Aplicar**. As mudanças entram no histórico de cada empresa e, se o
    servidor estiver ligado, são enviadas à equipe.
 
