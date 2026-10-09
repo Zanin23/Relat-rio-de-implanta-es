@@ -1,21 +1,12 @@
 /* =====================================================================
-   SERVIDOR COMPARTILHADO — configuração
-   ---------------------------------------------------------------------
-   É este arquivo que faz a alteração de um valer para todos. Depois de
-   criar o projeto no Supabase (veja README + supabase.sql), cole aqui a
-   URL e a anon key e faça commit: todo mundo que abrir o link passa a ler
-   e escrever no mesmo banco, em tempo real.
-
-   Deixou os campos em branco? O app funciona do jeito antigo (salva só no
-   navegador) e o rodapé avisa disso.
-
-   A anon key é pública por design — a proteção dos dados vem das políticas
-   de RLS criadas por supabase.sql. Ela não dá acesso a nada além do que as
-   políticas permitem.
+   SERVIDOR COMPARTILHADO do Relatório de Implantações.
+   Quem editar este arquivo e dar commit está publicando a conexão para a
+   equipe inteira. A anon key é pública por natureza: a segurança vem das
+   políticas RLS criadas em supabase.sql.
    ===================================================================== */
 window.SYNC_CONFIG = {
-  url: "https://dlnfuvhlkgnzesrnqgfd.supabase.co",                     // ex.: "https://abcdefghijmnop.supabase.co"
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsbmZ1dmhsa2duemVzcm5xZ2ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NDQ4MjcsImV4cCI6MjEwNzEyMDgyN30.ew9xsAmQcBXtsPt93dz5yPY7AXtBT3WfM67WTaVjCzo",                 // ex.: "eyJhbGciOiJIUzI1NiIs..." (longa, começa com eyJ)
-  table: "documentos",        // nome da tabela criada pelo supabase.sql
+  url: "https://dlnfuvhlkgnzesrnqgfd.supabase.co",
+  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsbmZ1dmhsa2duemVzcm5xZ2ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NDQ4MjcsImV4cCI6MjEwNzEyMDgyN30.ew9xsAmQcBXtsPt93dz5yPY7AXtBT3WfM67WTaVjCzo",
+  table: "documentos",
   schema: "public"
 };
