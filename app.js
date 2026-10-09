@@ -112,6 +112,20 @@
   }
 
   /* ================= PERSISTÊNCIA ================= */
+  function limparEstadoAntes(v) {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    var crono = limparCronograma(v.cronograma);
+    var st = STATUS[v.status] ? v.status : (v.status === "pendente" ? "pendente" : "");
+    if (!st && crono.length === 0 && !v.statusText && v.progresso == null) return null;
+    return {
+      status: st,
+      progresso: v.progresso == null || v.progresso === "" ? null : clamp(num(v.progresso, 0), 0, 100),
+      statusText: String(v.statusText || "").trim().slice(0, 400),
+      cronograma: crono,
+      atualizado: String(v.atualizado || "").slice(0, 10),
+      origem: String(v.origem || "").slice(0, 120)
+    };
+  }
   function normalizar(e) {
     return {
       id: e.id || (e.nome ? idDeNome(e.nome) : id()),
@@ -127,7 +141,8 @@
       observacao: String(e.observacao || e.note || "").trim(),
       atualizado: e.atualizado || hoje(),
       historico: hist(e.historico),
-      cronograma: limparCronograma(e.cronograma)
+      cronograma: limparCronograma(e.cronograma),
+      estadoAntesCronograma: limparEstadoAntes(e.estadoAntesCronograma || e.estadoAntesDoCronograma || e.backupPreCronograma || e.cronogramaBackup)
     };
   }
   function limparCronograma(v) {
@@ -569,7 +584,13 @@
         }).join("") + "</ol></div></div>"
       : "";
     var agenda = e.cronograma && e.cronograma.length
-      ? '<div class="statusbox"><h4>Agenda / cronograma (' + e.cronograma.length + ')</h4><div class="schedule-items">' +
+      ? '<div class="statusbox" style="position:relative"><h4>Agenda / cronograma (' + e.cronograma.length + ')</h4>' +
+        '<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;flex-wrap:wrap">' +
+          '<span class="report-badge visita">' + e.cronograma.length + ' itens vinculados</span>' +
+          (e.cronograma[0].origem ? '<span class="hint" style="margin:0;font-size:11px">origem: ' + esc(e.cronograma[0].origem) + '</span>' : '') +
+          (e.estadoAntesCronograma ? '<span class="hint" style="margin:0;font-size:11px;color:var(--ok)">· tem estado anterior salvo</span>' : '<span class="hint" style="margin:0;font-size:11px">· sem backup anterior</span>') +
+        '</div>' +
+        '<div class="schedule-items">' +
         e.cronograma.slice().sort(function (a, b) { return String(a.data || "9999-99-99").localeCompare(String(b.data || "9999-99-99")); }).slice(0, 12).map(function (item) {
           var metaItem = [];
           if (item.data) metaItem.push("Previsto: " + br(item.data));
@@ -586,7 +607,15 @@
             '<div class="report-meta">' + esc(metaItem.join(" · ")) + "</div></div></div>";
         }).join("") +
         (e.cronograma.length > 12 ? '<p class="hint">+' + (e.cronograma.length - 12) + " itens no cronograma.</p>" : "") +
-        "</div></div>"
+        "</div>" +
+        '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">' +
+          '<button class="btn sm danger" data-desvincular="' + e.id + '" title="Remove o cronograma e restaura o estado anterior">Desvincular cronograma</button>' +
+          '<button class="btn sm ghost" data-desvincular-editar="' + e.id + '">Desvincular na edição…</button>' +
+          '<span class="hint" style="margin:0">Volta ao que era antes da vinculação</span>' +
+        '</div>' +
+        '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:11px;color:var(--muted)">Ver detalhes da restauração</summary>' +
+          '<pre style="white-space:pre-wrap;word-break:break-word;font:11px/1.5 ui-monospace,monospace;background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:9px 10px;margin-top:7px;color:var(--muted)">' + esc(detalhesRestauracao(e)) + '</pre></details>' +
+        "</div>"
       : "";
 
     $("#modalBody").innerHTML =
@@ -611,6 +640,14 @@
         hist +
       "</div>";
     $("[data-edit]", $("#modalBody")).onclick = function () { abrirEditor(e.id); };
+    var btnDesv = $("[data-desvincular]", $("#modalBody"));
+    if (btnDesv) btnDesv.onclick = function () { desvincularCronogramaEmpresa(e.id); };
+    var btnDesvEdit = $("[data-desvincular-editar]", $("#modalBody"));
+    if (btnDesvEdit) btnDesvEdit.onclick = function () { abrirEditor(e.id); setTimeout(function(){
+      var chk = $("#fDesvincularCronograma");
+      var box = $("#vinculoCronogramaBox");
+      if (chk && box) { box.scrollIntoView({behavior:"smooth", block:"center"}); chk.focus(); }
+    }, 120); };
     $("#backdrop").classList.add("on");
   }
   function fecharDetalhe() { $("#backdrop").classList.remove("on"); ui.aberto = null; }
@@ -685,6 +722,78 @@
         '<input type="text" data-fasetxt="' + i + '" placeholder="detalhe (opcional)" value="' + esc(txt) + '"></div>';
     }).join("");
 
+    // ---- vinculo cronograma: mostra o box e prepara o desvincular ----
+    (function atualizarVinculoUI() {
+      var box = $("#vinculoCronogramaBox");
+      var chk = $("#fDesvincularCronograma");
+      if (!box || !chk) return;
+      if (!e || !e.cronograma || !e.cronograma.length) {
+        box.style.display = "none";
+        chk.checked = false;
+        return;
+      }
+      box.style.display = "";
+      var qtd = e.cronograma.length;
+      var origem = e.cronograma[0].origem || "importação";
+      var badge = $("#vinculoBadge");
+      if (badge) badge.textContent = qtd + " item(ns)";
+      var info = $("#vinculoInfo");
+      if (info) {
+        var venc = e.cronograma.filter(function (it) { return it.data && it.data < hoje() && it.status !== "concluido"; }).length;
+        var visitas = e.cronograma.filter(function (it) { return it.categoria === "visita"; }).length;
+        info.textContent = qtd + " itens vinculados · origem " + origem + " · " + visitas + " visita(s)" + (venc ? " · " + venc + " vencido(s)" : "") + " · atualizado " + br(e.atualizado);
+      }
+      var origemEl = $("#vinculoOrigem");
+      if (origemEl) origemEl.textContent = origem + " · " + qtd + " itens";
+      var hint = $("#vinculoHint");
+      var snap = e.estadoAntesCronograma;
+      if (snap) {
+        var lbl = STATUS[snap.status] ? STATUS[snap.status].label : (snap.status === "pendente" ? "Pendente" : snap.status || "—");
+        var prog = snap.progresso != null ? snap.progresso + "%" : "—";
+        if (hint) hint.textContent = "Ao salvar, o status voltará para \"" + lbl + "\" (" + prog + ") e o cronograma será removido. Estado de " + (snap.atualizado ? br(snap.atualizado) : "antes da vinculação") + ".";
+      } else {
+        var base = baselineComparavel().porNome[chaveNome(e.nome)];
+        if (base) {
+          var lblb = STATUS[base.status] ? STATUS[base.status].label : base.status;
+          if (hint) hint.textContent = "Sem backup desta vinculação — ao salvar voltará ao baseline: \"" + lblb + "\" (" + base.progresso + "%, " + br(base.atualizado) + ").";
+        } else {
+          if (hint) hint.textContent = "Ao salvar, o cronograma será removido e o status/progresso preenchidos acima serão mantidos.";
+        }
+      }
+      var prev = $("#vinculoPrevConteudo");
+      if (prev) prev.textContent = detalhesRestauracao(e);
+      // desmarcar por padrão a cada abertura
+      chk.checked = false;
+      // quando marcar, dá feedback visual no status/progresso
+      var basePrev = baselineComparavel().porNome[chaveNome(e.nome)];
+      chk.onchange = function () {
+        if (chk.checked) {
+          $("#fStatus").style.outline = "2px solid var(--risk)";
+          $("#fProg").style.outline = "2px solid var(--risk)";
+          if (snap) {
+            // pré-visualiza a restauração nos campos (sem salvar ainda)
+            $("#fStatus").value = STATUS[snap.status] ? snap.status : (snap.status === "pendente" ? "andamento" : $("#fStatus").value);
+            if (snap.progresso != null) { $("#fProg").value = snap.progresso; $("#fProgVal").textContent = snap.progresso + "%"; }
+            if (snap.statusText) $("#fStatusText").value = snap.statusText;
+          } else if (basePrev) {
+            $("#fStatus").value = basePrev.status;
+            $("#fProg").value = basePrev.progresso;
+            $("#fProgVal").textContent = basePrev.progresso + "%";
+            $("#fStatusText").value = basePrev.statusText;
+          }
+        } else {
+          $("#fStatus").style.outline = "";
+          $("#fProg").style.outline = "";
+          if (e) {
+            $("#fStatus").value = e.status;
+            $("#fProg").value = e.progresso;
+            $("#fProgVal").textContent = e.progresso + "%";
+            $("#fStatusText").value = e.statusText;
+          }
+        }
+      };
+    })();
+
     $("#editorBackdrop").classList.add("on");
     setTimeout(function () { $("#fNome").focus(); }, 40);
   }
@@ -699,6 +808,8 @@
       return [s.value, $("#phaseRows [data-fasetxt=\"" + s.dataset.fase + "\"]").value.trim().slice(0, 60)];
     });
     var antigo = editando ? porId(editando) : null;
+    var desvincularChk = $("#fDesvincularCronograma");
+    var querDesvincular = desvincularChk && desvincularChk.checked && antigo && antigo.cronograma && antigo.cronograma.length;
     var reg = {
       id: editando || id(),
       nome: nome,
@@ -713,19 +824,55 @@
       observacao: $("#fObs").value.trim(),
       atualizado: $("#fData").value || hoje(),
       historico: antigo ? antigo.historico.slice() : [],
-      cronograma: antigo ? (antigo.cronograma || []).slice() : []
+      cronograma: antigo ? (antigo.cronograma || []).slice() : [],
+      estadoAntesCronograma: antigo ? antigo.estadoAntesCronograma : null
     };
 
-    // histórico de continuidade: registra a mudança de status/progresso
-    var ultimo = reg.historico[0];
-    if (!ultimo || ultimo.progresso !== reg.progresso || ultimo.status !== reg.status || ultimo.texto !== reg.statusText) {
-      reg.historico.unshift({
-        data: reg.atualizado,
-        progresso: reg.progresso,
-        status: reg.status,
-        texto: reg.statusText.slice(0, 90)
-      });
+    // se marcou desvincular, restaura o estado de antes do cronograma
+    if (querDesvincular) {
+      var snap = antigo.estadoAntesCronograma;
+      if (snap) {
+        if (snap.status && (STATUS[snap.status] || snap.status === "pendente")) {
+          reg.status = snap.status === "pendente" ? "andamento" : snap.status;
+        }
+        if (snap.progresso != null) reg.progresso = snap.progresso;
+        reg.statusText = snap.statusText || "";
+        reg.cronograma = snap.cronograma ? snap.cronograma.slice() : [];
+        reg.estadoAntesCronograma = null;
+        reg.atualizado = $("#fData").value || hoje();
+        reg.historico.unshift({ data: reg.atualizado, progresso: reg.progresso, status: reg.status, texto: "Cronograma desvinculado — voltou ao estado anterior" });
+      } else {
+        var base = baselineComparavel().porNome[chaveNome(antigo.nome)];
+        if (base) {
+          reg.status = base.status;
+          reg.progresso = base.progresso;
+          reg.statusText = base.statusText;
+          reg.cronograma = base.cronograma ? base.cronograma.slice() : [];
+          reg.feito = base.feito.slice();
+          reg.falta = base.falta.slice();
+          reg.fases = base.fases.map(function (f) { return f.slice(); });
+          reg.estadoAntesCronograma = null;
+          reg.historico.unshift({ data: reg.atualizado, progresso: reg.progresso, status: reg.status, texto: "Cronograma desvinculado — restaurado do baseline" });
+        } else {
+          reg.cronograma = [];
+          reg.estadoAntesCronograma = null;
+          reg.historico.unshift({ data: reg.atualizado, progresso: reg.progresso, status: reg.status, texto: "Cronograma desvinculado — status mantido" });
+        }
+      }
       reg.historico = reg.historico.slice(0, 30);
+      // já deixa o histórico registrado, não precisa do bloco de continuidade abaixo
+    } else {
+      // histórico de continuidade: registra a mudança de status/progresso
+      var ultimo = reg.historico[0];
+      if (!ultimo || ultimo.progresso !== reg.progresso || ultimo.status !== reg.status || ultimo.texto !== reg.statusText) {
+        reg.historico.unshift({
+          data: reg.atualizado,
+          progresso: reg.progresso,
+          status: reg.status,
+          texto: reg.statusText.slice(0, 90)
+        });
+        reg.historico = reg.historico.slice(0, 30);
+      }
     }
 
     tocados[reg.id] = true;
@@ -737,8 +884,12 @@
       ui.sort = "origem";
     }
     if (!salvar()) return;
-    toast(nome + (antigo ? " atualizada" : " cadastrada no relatório") +
-      (sync.ativo() ? " — salvando para a equipe…" : " — salva só neste navegador"));
+    if (querDesvincular) {
+      toast(nome + " — cronograma desvinculado e voltou ao que era antes" + (sync.ativo() ? " — salvando para a equipe…" : ""));
+    } else {
+      toast(nome + (antigo ? " atualizada" : " cadastrada no relatório") +
+        (sync.ativo() ? " — salvando para a equipe…" : " — salva só neste navegador"));
+    }
     fecharEditor();
     renderTudo();
     if (ui.aberto) abrirDetalhe(reg.id);
@@ -1309,6 +1460,18 @@
     Object.keys(porEmpresa).forEach(function (empresaId) {
       var empresa = porId(empresaId), linhas = porEmpresa[empresaId];
       if (!empresa) return;
+      // guarda o estado de antes para permitir "desvincular e voltar ao que era antes"
+      var snapAntes = {
+        status: empresa.status,
+        progresso: empresa.progresso,
+        statusText: empresa.statusText,
+        cronograma: empresa.cronograma ? empresa.cronograma.slice() : [],
+        atualizado: empresa.atualizado,
+        origem: empresa.cronograma && empresa.cronograma.length ? String(empresa.cronograma[0].origem || "") : ""
+      };
+      // só sobrescreve o backup se ainda não existir um ou se o usuário não tiver desvinculado antes;
+      // cada nova vinculação guarda o estado imediatamente anterior
+      empresa.estadoAntesCronograma = snapAntes;
       empresa.cronograma = linhas.map(function (linha, i) {
         return {
           id: linha.id || ("import-" + dataAtual + "-" + i),
@@ -1357,6 +1520,111 @@
     renderTudo();
     toast(atualizadas + " empresa(s) atualizada(s) pelo cronograma" + (criadas ? " · " + criadas + " cadastrada(s)" : "") +
       (dadosStatusDetectados ? " · status/progresso conferidos" : " · o arquivo não trouxe status reconhecível"));
+  }
+
+  /* ---------- DESVINCULAR CRONOGRAMA ---------- */
+  function textoResumoEstado(e) {
+    if (!e) return "—";
+    var base = e.estadoAntesCronograma;
+    if (base) {
+      var lbl = STATUS[base.status] ? STATUS[base.status].label : (base.status === "pendente" ? "Pendente" : "—");
+      var prog = base.progresso != null ? base.progresso + "%" : "—";
+      var cronoQtd = base.cronograma ? base.cronograma.length : 0;
+      var extra = cronoQtd ? " · " + cronoQtd + " item(ns) de cronograma" : " · sem cronograma";
+      var orig = base.origem ? " (" + base.origem + ")" : "";
+      return lbl + " · " + prog + " · " + (base.statusText || "sem statusText") + extra + orig + " · atualizado " + (base.atualizado ? br(base.atualizado) : "—");
+    }
+    var b = baselineComparavel().porNome[chaveNome(e.nome)];
+    if (b) {
+      var lbl2 = STATUS[b.status] ? STATUS[b.status].label : b.status;
+      return lbl2 + " · " + b.progresso + "% · " + (b.statusText || "—") + " · baseline de " + br(b.atualizado);
+    }
+    return "Removerá apenas o cronograma (" + (e.cronograma ? e.cronograma.length : 0) + " itens) e manterá o status atual preenchido no formulário.";
+  }
+
+  function detalhesRestauracao(e) {
+    if (!e || !e.cronograma || !e.cronograma.length) return "Esta empresa não tem cronograma vinculado.";
+    var snap = e.estadoAntesCronograma;
+    if (snap) {
+      var lbl = STATUS[snap.status] ? STATUS[snap.status].label : (snap.status || "—");
+      var prog = snap.progresso != null ? snap.progresso + "%" : "—";
+      var qtd = snap.cronograma ? snap.cronograma.length : 0;
+      return "Cronograma atual: " + e.cronograma.length + " item(ns) de " + esc(e.cronograma[0].origem || "importação") + "\n" +
+        "Estado que será restaurado:\n" +
+        "  Status: " + lbl + "\n" +
+        "  Progresso: " + prog + "\n" +
+        "  Status atual: " + (snap.statusText || "—") + "\n" +
+        "  Cronograma anterior: " + qtd + " item(ns)" + (snap.origem ? " (" + snap.origem + ")" : "") + "\n" +
+        "  Atualizado em: " + (snap.atualizado ? br(snap.atualizado) : "—");
+    }
+    var base = baselineComparavel().porNome[chaveNome(e.nome)];
+    if (base) {
+      var lblb = STATUS[base.status] ? STATUS[base.status].label : base.status;
+      return "Cronograma atual: " + e.cronograma.length + " item(ns)\n" +
+        "Não há backup salvo desta vinculação. Ao desvincular, a empresa voltará ao baseline original:\n" +
+        "  Status: " + lblb + "\n" +
+        "  Progresso: " + base.progresso + "%\n" +
+        "  Status atual: " + (base.statusText || "—") + "\n" +
+        "  Atualizado em: " + br(base.atualizado);
+    }
+    return "Cronograma atual: " + e.cronograma.length + " item(ns) de " + esc(e.cronograma[0].origem || "importação") + "\n" +
+      "Não há estado anterior salvo. O cronograma será removido e o status/progresso atuais do formulário serão mantidos.";
+  }
+
+  function desvincularCronogramaEmpresa(eid) {
+    var e = porId(eid);
+    if (!e || !e.cronograma || !e.cronograma.length) { toast("Esta empresa não tem cronograma vinculado."); return; }
+    var snap = e.estadoAntesCronograma;
+    var base = baselineComparavel().porNome[chaveNome(e.nome)];
+    var msg = "";
+    if (snap) {
+      var lbl = STATUS[snap.status] ? STATUS[snap.status].label : snap.status;
+      msg = "Desvincular o cronograma de \"" + e.nome + "\" e voltar ao que era antes?\n\n" +
+        "Cronograma atual: " + e.cronograma.length + " item(ns) de " + (e.cronograma[0].origem || "importação") + ".\n" +
+        "Voltará para: " + lbl + " · " + (snap.progresso != null ? snap.progresso + "%" : "—") + " · " + br(snap.atualizado) + ".\n" +
+        "Isso remove o cronograma vinculado e restaura o status/progresso anteriores.";
+    } else if (base) {
+      var lblb = STATUS[base.status] ? STATUS[base.status].label : base.status;
+      msg = "Desvincular o cronograma de \"" + e.nome + "\" e restaurar os dados originais?\n\n" +
+        "Cronograma atual: " + e.cronograma.length + " item(ns).\n" +
+        "Não há backup da vinculação, então voltará ao baseline: " + lblb + " · " + base.progresso + "% · " + br(base.atualizado) + ".";
+    } else {
+      msg = "Desvincular o cronograma de \"" + e.nome + "\"? Isso removerá " + e.cronograma.length + " item(ns) vinculados e manterá o status atual.";
+    }
+    if (!window.confirm(msg)) return;
+    if (snap) {
+      e.status = snap.status && STATUS[snap.status] ? snap.status : (snap.status === "pendente" ? "andamento" : e.status);
+      // se o backup não tinha progresso, mantém o atual
+      if (snap.progresso != null) e.progresso = snap.progresso;
+      e.statusText = snap.statusText || "";
+      e.cronograma = snap.cronograma ? snap.cronograma.slice() : [];
+      e.estadoAntesCronograma = null;
+      // mantém a data do backup ou usa hoje como atualização do desfazer
+      e.atualizado = hoje();
+    } else if (base) {
+      e.status = base.status;
+      e.progresso = base.progresso;
+      e.statusText = base.statusText;
+      e.cronograma = base.cronograma ? base.cronograma.slice() : [];
+      e.feito = base.feito.slice();
+      e.falta = base.falta.slice();
+      e.fases = base.fases.map(function (f) { return f.slice(); });
+      e.estadoAntesCronograma = null;
+      e.atualizado = hoje();
+    } else {
+      e.cronograma = [];
+      e.estadoAntesCronograma = null;
+      e.atualizado = hoje();
+    }
+    e.historico = e.historico || [];
+    e.historico.unshift({ data: e.atualizado, progresso: e.progresso, status: e.status, texto: "Cronograma desvinculado — voltou ao estado anterior" });
+    e.historico = e.historico.slice(0, 30);
+    tocados[e.id] = true;
+    if (!gravarCache()) return;
+    sync.alterou();
+    renderTudo();
+    if (ui.aberto === eid) abrirDetalhe(eid);
+    toast(e.nome + " — cronograma desvinculado e estado anterior restaurado.");
   }
 
   /* ---------- aplicar: carteira de empresas ---------- */
