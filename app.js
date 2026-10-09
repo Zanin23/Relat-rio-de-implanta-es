@@ -40,6 +40,9 @@
     concluido:      { label: "Concluído",                 color: "var(--ok)"   }
   };
   var STATUS_ORDEM = ["risco", "cliente", "desenvolvimento", "andamento", "concluido"];
+  function rotuloStatusCronograma(status) {
+    return status === "pendente" ? "Pendente" : (STATUS[status] ? STATUS[status].label : "Status não identificado");
+  }
 
   var TIPOS = ["Nova implantação", "Reimplantação", "Migração Cloud", "Treinamento", "Suporte / ajustes", "Outro"];
 
@@ -50,6 +53,7 @@
   var db = { data: "", empresas: [] };          // dados ativos
   var tocados = {};                             // ids editados NESTA sessão (desempate de conflito)
   var editando = null;                          // id da empresa em edição
+  var pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false };
   var ui = { status: "all", type: "all", q: "", sort: "origem", aberto: null, present: 0 };
 
   /* ================= HELPERS ================= */
@@ -113,8 +117,30 @@
       fases: fases(e.fases || e.phases),
       observacao: String(e.observacao || e.note || "").trim(),
       atualizado: e.atualizado || hoje(),
-      historico: hist(e.historico)
+      historico: hist(e.historico),
+      cronograma: limparCronograma(e.cronograma)
     };
+  }
+  function limparCronograma(v) {
+    if (!Array.isArray(v)) return [];
+    return v.filter(function (item) { return item && typeof item === "object"; }).map(function (item, i) {
+      var progresso = item.progresso == null || item.progresso === "" ? null : clamp(num(item.progresso, 0), 0, 100);
+      return {
+        id: String(item.id || ("crono-" + i + "-" + chaveNome((item.atividade || item.tarefa || item.nome || "item") + "-" + (item.data || item.prazo || "")).slice(0, 20))),
+        atividade: String(item.atividade || item.tarefa || item.nome || "Item do cronograma").trim().slice(0, 240),
+        fase: String(item.fase || "").trim().slice(0, 120),
+        data: String(item.data || item.prazo || "").slice(0, 10),
+        visitaData: String(item.visitaData || "").slice(0, 10),
+        concluidoEm: String(item.concluidoEm || "").slice(0, 10),
+        responsavel: String(item.responsavel || "").trim().slice(0, 120),
+        hora: String(item.hora || "").slice(0, 5),
+        categoria: item.categoria === "visita" ? "visita" : "etapa",
+        status: STATUS[item.status] ? item.status : item.status === "pendente" ? "pendente" : "",
+        progresso: progresso,
+        origem: String(item.origem || "PDF").slice(0, 120),
+        atualizado: String(item.atualizado || hoje()).slice(0, 10)
+      };
+    }).filter(function (item) { return item.atividade; }).slice(-300);
   }
   function arr(v) {
     if (!v || !Array.isArray(v)) return [];
@@ -204,7 +230,8 @@
       if (ui.status !== "all" && e.status !== ui.status) return false;
       if (ui.type !== "all" && e.tipo !== ui.type) return false;
       if (q) {
-        var hay = [e.nome, e.tipo, e.statusText, e.observacao].concat(e.feito, e.falta, e.grupo).join(" ").toLowerCase();
+        var itensCronogramaBusca = (e.cronograma || []).map(function (item) { return [item.fase, item.atividade, item.responsavel].join(" "); });
+        var hay = [e.nome, e.tipo, e.statusText, e.observacao].concat(e.feito, e.falta, e.grupo, itensCronogramaBusca).join(" ").toLowerCase();
         if (hay.indexOf(q) < 0) return false;
       }
       return true;
@@ -284,6 +311,95 @@
       ? "<b style='color:var(--wait)'>" + cli + "</b> de " + db.empresas.length + " aguardam retorno, validação ou uso do cliente · " +
         "<b style='color:var(--dev)'>" + dev + "</b> dependem do desenvolvimento."
       : "";
+  }
+
+  function itensCronograma() {
+    var itens = [];
+    db.empresas.forEach(function (e) {
+      (e.cronograma || []).forEach(function (item) {
+        itens.push({ empresa: e, item: item });
+        if (item.visitaData && !(item.categoria === "visita" && item.visitaData === item.data)) {
+          var visita = {};
+          Object.keys(item).forEach(function (k) { visita[k] = item[k]; });
+          visita.data = item.visitaData;
+          visita.visitaData = "";
+          visita.categoria = "visita";
+          visita.atividade = "Visita agendada — " + item.atividade;
+          itens.push({ empresa: e, item: visita });
+        }
+      });
+    });
+    return itens;
+  }
+
+  function renderReports() {
+    var faixas = [
+      { label: "0–25%", min: 0, max: 25 },
+      { label: "26–50%", min: 26, max: 50 },
+      { label: "51–75%", min: 51, max: 75 },
+      { label: "76–99%", min: 76, max: 99 },
+      { label: "100%", min: 100, max: 100 }
+    ];
+    var contagens = faixas.map(function (f) {
+      return db.empresas.filter(function (e) {
+        var pct = e.status === "concluido" ? 100 : e.progresso;
+        return pct >= f.min && pct <= f.max;
+      }).length;
+    });
+    var maxFaixa = Math.max.apply(null, contagens.concat([1]));
+    $("#progressReport").innerHTML = db.empresas.length ? faixas.map(function (f, i) {
+      var n = contagens[i];
+      return '<div class="report-bar"><span class="label">' + f.label + "</span>" +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + (n / maxFaixa * 100) + '%;background:var(--accent)"></div></div>' +
+        '<b class="value">' + n + "</b></div>";
+    }).join("") + '<p class="report-note">Média da carteira: ' + mediaProgresso() + "% de progresso.</p>"
+      : '<p class="none">Nenhuma empresa cadastrada.</p>';
+
+    var ranking = db.empresas.map(function (e) {
+      var itensAbertos = (e.cronograma || []).filter(function (item) { return item.status !== "concluido"; }).length;
+      var quantidade = e.falta.length + itensAbertos;
+      return { empresa: e, quantidade: quantidade, base: e.falta.length + " pendências · " + itensAbertos + " itens de cronograma" };
+    }).filter(function (r) { return r.quantidade > 0; }).sort(function (a, b) {
+      var riscoA = a.empresa.status === "risco" ? 1 : 0, riscoB = b.empresa.status === "risco" ? 1 : 0;
+      return riscoB - riscoA || b.quantidade - a.quantidade || a.empresa.nome.localeCompare(b.empresa.nome, "pt-BR");
+    }).slice(0, 6);
+    $("#priorityReport").innerHTML = ranking.length
+      ? '<div class="report-list">' + ranking.map(function (r) {
+          return '<div class="report-row"><div style="min-width:0"><button class="report-company" data-report-company="' + esc(r.empresa.id) + '">' + esc(r.empresa.nome) + "</button>" +
+            '<div class="report-meta">' + esc(STATUS[r.empresa.status].label) + " · " + esc(r.base) + "</div></div>" +
+            '<span class="report-count">' + r.quantidade + " em aberto</span></div>";
+        }).join("") + "</div>"
+      : '<p class="none">Nenhuma pendência registrada.</p>';
+
+    var todos = itensCronograma();
+    var emAberto = todos.filter(function (reg) { return reg.item.status !== "concluido"; });
+    var atrasados = emAberto.filter(function (reg) { return reg.item.data && reg.item.data < hoje(); }).length;
+    var visitas = emAberto.filter(function (reg) { return reg.item.categoria === "visita"; }).length;
+    emAberto.sort(function (a, b) {
+      var da = a.item.data || "9999-99-99", dbb = b.item.data || "9999-99-99";
+      return da.localeCompare(dbb) || String(a.item.hora || "").localeCompare(String(b.item.hora || ""));
+    });
+    $("#agendaReport").innerHTML = todos.length
+      ? '<div class="report-summary" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:8px">' +
+        '<span class="report-badge' + (atrasados ? " atrasado" : "") + '">' + atrasados + " vencidos</span>" +
+        '<span class="report-badge visita">' + visitas + " visitas em aberto</span>" +
+        '<span class="report-badge">' + todos.length + " eventos (etapas/visitas)</span></div>" +
+        (emAberto.length ? '<div class="report-list">' + emAberto.slice(0, 6).map(function (reg) {
+          var item = reg.item, vencido = item.data && item.data < hoje();
+          var status = rotuloStatusCronograma(item.status);
+          return '<div class="report-row"><div style="min-width:0"><button class="report-company" data-report-company="' + esc(reg.empresa.id) + '">' + esc(reg.empresa.nome) + "</button>" +
+            '<div class="report-meta">' + esc(item.atividade) + " · " + esc(status) + "</div>" +
+            '<span class="report-badge ' + (item.categoria === "visita" ? "visita" : "") + '">' + (item.categoria === "visita" ? "Visita" : "Etapa") + "</span>" +
+            (vencido ? ' <span class="report-badge atrasado">Vencido</span>' : "") + "</div>" +
+            '<span class="report-date">' + (item.data ? esc(br(item.data)) : "Sem data") + (item.hora ? "<br>" + esc(item.hora) : "") + "</span></div>";
+        }).join("") + "</div>" : '<p class="none">Todos os itens do cronograma estão concluídos.</p>')
+      : '<p class="none">Importe um cronograma PDF para preencher este relatório de agenda e visitas.</p><button type="button" class="btn sm" id="reportImportSchedule">Importar cronograma PDF</button>';
+
+    $$("[data-report-company]").forEach(function (button) {
+      button.onclick = function () { abrirDetalhe(button.dataset.reportCompany); };
+    });
+    var importar = $("#reportImportSchedule");
+    if (importar) importar.onclick = abrirImportadorCronograma;
   }
 
   /* ================= RENDER: MATRIZ ================= */
@@ -418,7 +534,7 @@
   }
 
   function renderTudo() {
-    renderTopo(); renderKpis(); renderStatusChart(); renderTypeChart();
+    renderTopo(); renderKpis(); renderStatusChart(); renderTypeChart(); renderReports();
     renderMatrix(); renderFiltros(); renderGrid(); renderFooter();
   }
 
@@ -443,6 +559,26 @@
             (h.texto ? ' <span style="color:var(--faint)">— ' + esc(h.texto) + "</span>" : "") + "</li>";
         }).join("") + "</ol></div></div>"
       : "";
+    var agenda = e.cronograma && e.cronograma.length
+      ? '<div class="statusbox"><h4>Agenda / cronograma (' + e.cronograma.length + ')</h4><div class="schedule-items">' +
+        e.cronograma.slice().sort(function (a, b) { return String(a.data || "9999-99-99").localeCompare(String(b.data || "9999-99-99")); }).slice(0, 12).map(function (item) {
+          var metaItem = [];
+          if (item.data) metaItem.push("Previsto: " + br(item.data));
+          if (item.visitaData) metaItem.push("Visita agendada: " + br(item.visitaData));
+          if (item.concluidoEm) metaItem.push("Concluído: " + br(item.concluidoEm));
+          if (item.hora) metaItem.push(item.hora);
+          metaItem.push(rotuloStatusCronograma(item.status));
+          if (item.responsavel) metaItem.push("Resp.: " + item.responsavel);
+          if (item.progresso != null) metaItem.push(item.progresso + "%");
+          return '<div class="schedule-item"><div>' +
+            (item.fase ? '<div class="report-meta"><b>' + esc(item.fase) + "</b></div>" : "") +
+            '<span class="report-badge ' + (item.categoria === "visita" ? "visita" : "") + '">' +
+            (item.categoria === "visita" ? "Visita" : "Etapa") + "</span> <b>" + esc(item.atividade) + "</b>" +
+            '<div class="report-meta">' + esc(metaItem.join(" · ")) + "</div></div></div>";
+        }).join("") +
+        (e.cronograma.length > 12 ? '<p class="hint">+' + (e.cronograma.length - 12) + " itens no cronograma.</p>" : "") +
+        "</div></div>"
+      : "";
 
     $("#modalBody").innerHTML =
       '<div class="body">' +
@@ -460,6 +596,7 @@
           '<div class="box"><h4>O que ainda falta fazer</h4>' + (e.falta.length ? '<ul class="list pend">' + e.falta.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul>" : '<p class="none">Nada pendente.</p>') + "</div>" +
           (e.grupo.length ? '<div class="box"><h4>Outras empresas do grupo</h4><ul class="list grupo">' + e.grupo.map(function (t) { return "<li>" + esc(t) + "</li>"; }).join("") + "</ul></div>" : "") +
         "</div>" +
+        agenda +
         (e.statusText || e.observacao ? '<div class="statusbox"><h4>Status atual</h4><p>' + esc(e.statusText) + "</p>" +
           (e.observacao ? '<p class="obs">' + esc(e.observacao) + "</p>" : "") + "</div>" : "") +
         hist +
@@ -566,7 +703,8 @@
       fases: fases,
       observacao: $("#fObs").value.trim(),
       atualizado: $("#fData").value || hoje(),
-      historico: antigo ? antigo.historico.slice() : []
+      historico: antigo ? antigo.historico.slice() : [],
+      cronograma: antigo ? (antigo.cronograma || []).slice() : []
     };
 
     // histórico de continuidade: registra a mudança de status/progresso
@@ -631,6 +769,45 @@
     };
   }
 
+  function csvCampo(valor) {
+    var texto = String(valor == null ? "" : valor);
+    if (/^[=+\-@\t\r]/.test(texto)) texto = "'" + texto;
+    return '"' + texto.replace(/"/g, '""') + '"';
+  }
+  function baixarRelatorioCsv(nome, cabecalhos, linhas) {
+    var conteudo = "\uFEFF" + [cabecalhos].concat(linhas).map(function (linha) {
+      return linha.map(csvCampo).join(";");
+    }).join("\r\n");
+    baixar(nome + "-" + hoje() + ".csv", conteudo, "text/csv;charset=utf-8");
+    toast(nome + " exportado em CSV (" + linhas.length + " linha(s)).");
+  }
+
+  $("#btnReportPortfolio").onclick = function () {
+    var linhas = db.empresas.map(function (e) {
+      return [e.nome, e.tipo, STATUS[e.status].label, e.progresso + "%", e.feito.length, e.falta.length, e.atualizado, e.statusText];
+    });
+    baixarRelatorioCsv("carteira-implantacoes", ["Empresa", "Tipo", "Status", "Progresso", "Itens concluídos", "Pendências", "Atualizado em", "Status atual"], linhas);
+  };
+  $("#btnReportPendencias").onclick = function () {
+    var linhas = [];
+    db.empresas.forEach(function (e) {
+      e.falta.forEach(function (item) { linhas.push([e.nome, "", item, STATUS[e.status].label, "Pendência registrada", "", "", ""]); });
+      (e.cronograma || []).filter(function (item) { return item.status !== "concluido"; }).forEach(function (item) {
+        linhas.push([e.nome, item.fase, item.atividade, STATUS[e.status].label, item.categoria === "visita" ? "Visita em aberto" : "Etapa em aberto", item.data ? br(item.data) : "", item.visitaData ? br(item.visitaData) : "", item.responsavel || ""]);
+      });
+    });
+    baixarRelatorioCsv("pendencias-implantacoes", ["Empresa", "Fase", "Item", "Status da empresa", "Origem", "Previsto", "Visita agendada", "Responsável"], linhas);
+  };
+  $("#btnReportAgenda").onclick = function () {
+    var linhas = [];
+    db.empresas.forEach(function (e) {
+      (e.cronograma || []).forEach(function (item) {
+        linhas.push([e.nome, item.fase, item.atividade, item.categoria === "visita" ? "Visita" : "Etapa", item.data ? br(item.data) : "", item.visitaData ? br(item.visitaData) : "", item.concluidoEm ? br(item.concluidoEm) : "", item.hora || "", item.responsavel || "", rotuloStatusCronograma(item.status), item.progresso == null ? "" : item.progresso + "%", item.origem]);
+      });
+    });
+    baixarRelatorioCsv("agenda-visitas-cronograma", ["Empresa", "Fase", "Atividade", "Tipo", "Previsto", "Visita agendada", "Concluído em", "Hora", "Responsável", "Status", "Progresso", "Origem"], linhas);
+  };
+
   $("#mExport").onclick = function () {
     baixar("implantacoes-" + hoje() + ".json", JSON.stringify(payload(), null, 2));
     toast("JSON exportado (" + db.empresas.length + " empresas).");
@@ -666,6 +843,270 @@
     };
     r.readAsText(f);
   };
+
+  /* ================= IMPORTAR CRONOGRAMA PDF ================= */
+  function estadoImportacaoPdf(texto, tipo) {
+    var el = $("#scheduleImportState");
+    el.className = "import-state" + (tipo ? " " + tipo : "");
+    el.textContent = texto;
+  }
+
+  function abrirImportadorCronograma() {
+    pdfImport = { arquivo: "", linhas: [], texto: "", paginas: 0, carregando: false };
+    $("#scheduleFileInput").value = "";
+    $("#schedulePreviewArea").style.display = "none";
+    $("#schedulePreview").innerHTML = "";
+    $("#scheduleChooseFile").disabled = false;
+    $("#scheduleApply").disabled = true;
+    estadoImportacaoPdf("Nenhum arquivo selecionado. O relatório não será alterado até você clicar em “Aplicar atualizações”.", "");
+    $("#scheduleBackdrop").classList.add("on");
+  }
+
+  function fecharImportadorCronograma() {
+    $("#scheduleBackdrop").classList.remove("on");
+  }
+
+  function opcoesStatusCronograma(selecionado) {
+    var html = '<option value="">Não reconhecido — não muda o status</option>' +
+      '<option value="pendente"' + (selecionado === "pendente" ? " selected" : "") + ">Pendente</option>";
+    Object.keys(STATUS).forEach(function (k) {
+      html += '<option value="' + k + '"' + (selecionado === k ? " selected" : "") + ">" + esc(STATUS[k].label) + "</option>";
+    });
+    return html;
+  }
+
+  function renderTabelaCronograma() {
+    var empresas = db.empresas.slice().sort(function (a, b) { return a.nome.localeCompare(b.nome, "pt-BR"); });
+    var html = pdfImport.linhas.map(function (linha, i) {
+      var opEmpresas = '<option value="">— selecione —</option>' + empresas.map(function (e) {
+        return '<option value="' + esc(e.id) + '"' + (linha.empresaId === e.id ? " selected" : "") + ">" + esc(e.nome) + "</option>";
+      }).join("");
+      var prog = linha.progresso == null ? "" : linha.progresso;
+      return '<tr data-pdf-row="' + i + '">' +
+        '<td><select data-field="empresaId" aria-label="Empresa">' + opEmpresas + "</select></td>" +
+        '<td><input type="text" data-field="fase" value="' + esc(linha.fase || "") + '" aria-label="Fase"></td>' +
+        '<td class="activity"><input type="text" data-field="atividade" value="' + esc(linha.atividade) + '" aria-label="Atividade"></td>' +
+        '<td><input type="date" data-field="data" value="' + esc(linha.data || "") + '" aria-label="Data prevista"></td>' +
+        '<td><input type="date" data-field="visitaData" value="' + esc(linha.visitaData || "") + '" aria-label="Data da visita"></td>' +
+        '<td><input type="date" data-field="concluidoEm" value="' + esc(linha.concluidoEm || "") + '" aria-label="Data de conclusão"></td>' +
+        '<td><input type="time" data-field="hora" value="' + esc(linha.hora || "") + '" aria-label="Hora"></td>' +
+        '<td><input type="text" data-field="responsavel" value="' + esc(linha.responsavel || "") + '" aria-label="Responsável"></td>' +
+        '<td><select data-field="categoria" aria-label="Tipo"><option value="etapa"' + (linha.categoria !== "visita" ? " selected" : "") + '>Etapa</option><option value="visita"' + (linha.categoria === "visita" ? " selected" : "") + '>Visita</option></select></td>' +
+        '<td><select data-field="status" aria-label="Status">' + opcoesStatusCronograma(linha.status) + "</select></td>" +
+        '<td><input type="number" min="0" max="100" step="1" data-field="progresso" value="' + esc(prog) + '" placeholder="—" aria-label="Progresso percentual"></td>' +
+        '<td class="use"><input type="checkbox" data-field="usar"' + (linha.usar ? " checked" : "") + ' aria-label="Usar esta linha"></td>' +
+        "</tr>";
+    }).join("");
+    $("#schedulePreview").innerHTML = html;
+    atualizarResumoCronograma();
+  }
+
+  function atualizarResumoCronograma() {
+    var linhas = pdfImport.linhas || [];
+    var selecionadas = linhas.filter(function (r) { return r.usar && r.empresaId && String(r.atividade || "").trim(); });
+    var empresas = {};
+    selecionadas.forEach(function (r) { empresas[r.empresaId] = true; });
+    var statusConhecidos = selecionadas.filter(function (r) { return !!STATUS[r.status] || r.status === "pendente"; }).length;
+    var visitas = selecionadas.filter(function (r) { return r.categoria === "visita" || !!r.visitaData; }).length;
+    var semEmpresa = linhas.filter(function (r) { return !r.empresaId; }).length;
+    $("#scheduleSummary").innerHTML =
+      '<span><b>' + linhas.length + "</b> itens lidos</span>" +
+      '<span><b>' + selecionadas.length + "</b> selecionados</span>" +
+      '<span><b>' + Object.keys(empresas).length + "</b> empresas</span>" +
+      '<span><b>' + statusConhecidos + "</b> status reconhecidos</span>" +
+      '<span><b>' + visitas + "</b> visitas</span>" +
+      (semEmpresa ? '<span><b>' + semEmpresa + "</b> sem empresa associada</span>" : "");
+    $("#scheduleApply").disabled = !selecionadas.length || pdfImport.carregando;
+  }
+
+  async function processarPdfCronograma(arquivo) {
+    if (!arquivo) return;
+    pdfImport = { arquivo: arquivo.name || "cronograma.pdf", linhas: [], texto: "", paginas: 0, carregando: true };
+    $("#schedulePreviewArea").style.display = "none";
+    $("#scheduleChooseFile").disabled = true;
+    $("#scheduleApply").disabled = true;
+    estadoImportacaoPdf("Lendo “" + pdfImport.arquivo + "”… o arquivo permanece neste dispositivo.", "");
+    try {
+      if (!window.CRONOGRAMA_PDF) throw new Error("O leitor de PDF não carregou. Atualize a página e tente novamente.");
+      var extraido = await window.CRONOGRAMA_PDF.lerPdf(arquivo);
+      pdfImport.paginas = extraido.paginas;
+      pdfImport.texto = extraido.texto || "";
+      if (!pdfImport.texto.trim()) {
+        $("#schedulePreviewArea").style.display = "";
+        $("#scheduleRawText").textContent = "Nenhum texto foi encontrado. Este arquivo provavelmente é uma digitalização. É necessário aplicar OCR ao PDF antes de importar.";
+        estadoImportacaoPdf("Não encontrei texto pesquisável no PDF. Se ele foi digitalizado como imagem, aplique OCR e envie novamente.", "err");
+        return;
+      }
+      pdfImport.linhas = window.CRONOGRAMA_PDF.interpretarLinhas(extraido.linhas, db.empresas);
+      $("#schedulePreviewArea").style.display = "";
+      $("#scheduleRawText").textContent = pdfImport.texto;
+      renderTabelaCronograma();
+      var avisoLimite = extraido.linhas.length > window.CRONOGRAMA_PDF.maxLinhas ? " A prévia foi limitada a " + window.CRONOGRAMA_PDF.maxLinhas + " linhas." : "";
+      if (pdfImport.linhas.length) {
+        estadoImportacaoPdf("PDF lido: " + pdfImport.paginas + " página(s). Revise a empresa, a atividade e o status em cada linha antes de aplicar." + avisoLimite, "ok");
+      } else {
+        estadoImportacaoPdf("Extraí texto de " + pdfImport.paginas + " página(s), mas não reconheci linhas de atividade automaticamente. Adicione linhas manualmente ou envie este PDF para ajustarmos o leitor ao formato." + avisoLimite, "err");
+      }
+    } catch (erro) {
+      estadoImportacaoPdf(erro && erro.message ? erro.message : "Não foi possível ler o PDF.", "err");
+    } finally {
+      pdfImport.carregando = false;
+      $("#scheduleChooseFile").disabled = false;
+      atualizarResumoCronograma();
+    }
+  }
+
+  function atualizarLinhasDaPrevia() {
+    $$("#schedulePreview tr[data-pdf-row]").forEach(function (tr) {
+      var i = num(tr.dataset.pdfRow, -1), linha = pdfImport.linhas[i];
+      if (!linha) return;
+      $$("[data-field]", tr).forEach(function (campo) {
+        var nome = campo.dataset.field;
+        if (nome === "usar") linha[nome] = campo.checked;
+        else if (nome === "progresso") linha[nome] = campo.value === "" ? null : clamp(num(campo.value, 0), 0, 100);
+        else linha[nome] = campo.value;
+      });
+      var empresa = porId(linha.empresaId);
+      linha.empresaNome = empresa ? empresa.nome : "";
+    });
+  }
+
+  function adicionarLinhaCronogramaManual() {
+    pdfImport.linhas.push({
+      id: "pdf-manual-" + (pdfImport.linhas.length + 1), empresaId: "", empresaNome: "",
+      atividade: "", fase: "", data: "", visitaData: "", concluidoEm: "", responsavel: "",
+      hora: "", categoria: "etapa", status: "", progresso: null,
+      usar: false, pagina: 0, trecho: ""
+    });
+    renderTabelaCronograma();
+    var ultima = $("#schedulePreview tr:last-child input[data-field=atividade]");
+    if (ultima) ultima.focus();
+  }
+
+  function statusAgregadoCronograma(linhas) {
+    var estados = linhas.map(function (r) { return r.status; }).filter(function (s) { return !!STATUS[s] || s === "pendente"; });
+    if (!estados.length) return "";
+    var prioridade = ["risco", "cliente", "desenvolvimento", "andamento"];
+    for (var i = 0; i < prioridade.length; i++) if (estados.indexOf(prioridade[i]) >= 0) return prioridade[i];
+    if (estados.indexOf("pendente") >= 0) return "andamento";
+    return linhas.length && linhas.every(function (r) { return r.status === "concluido"; }) ? "concluido" : "";
+  }
+
+  function progressoAgregadoCronograma(linhas) {
+    var porcentagens = linhas.map(function (r) { return r.progresso; }).filter(function (n) { return n != null; });
+    if (!porcentagens.length || (porcentagens.length !== linhas.length && linhas.length !== 1)) return null;
+    return Math.round(porcentagens.reduce(function (a, n) { return a + n; }, 0) / porcentagens.length);
+  }
+
+  function aplicarCronogramaPdf() {
+    atualizarLinhasDaPrevia();
+    var selecionadas = pdfImport.linhas.filter(function (r) { return r.usar && r.empresaId && String(r.atividade || "").trim() && porId(r.empresaId); });
+    if (!selecionadas.length) { toast("Selecione ao menos uma linha e associe a uma empresa."); return; }
+    var porEmpresa = {};
+    selecionadas.forEach(function (linha) {
+      if (!porEmpresa[linha.empresaId]) porEmpresa[linha.empresaId] = [];
+      porEmpresa[linha.empresaId].push(linha);
+    });
+    var dataAtual = hoje(), atualizadas = 0, dadosStatusDetectados = 0;
+    Object.keys(porEmpresa).forEach(function (empresaId) {
+      var empresa = porId(empresaId), linhas = porEmpresa[empresaId];
+      if (!empresa) return;
+      empresa.cronograma = linhas.map(function (linha, i) {
+        return {
+          id: linha.id || ("pdf-" + dataAtual + "-" + i),
+          atividade: linha.atividade.trim() || "Item do cronograma",
+          fase: String(linha.fase || "").trim(),
+          data: linha.data || "",
+          visitaData: linha.visitaData || "",
+          concluidoEm: linha.concluidoEm || "",
+          responsavel: String(linha.responsavel || "").trim(),
+          hora: linha.hora || "",
+          categoria: linha.categoria === "visita" ? "visita" : "etapa",
+          status: STATUS[linha.status] || linha.status === "pendente" ? linha.status : "",
+          progresso: linha.progresso == null ? null : clamp(num(linha.progresso, 0), 0, 100),
+          origem: pdfImport.arquivo,
+          atualizado: dataAtual
+        };
+      });
+      var novoStatus = statusAgregadoCronograma(linhas);
+      var novoProgresso = progressoAgregadoCronograma(linhas);
+      var concluidas = linhas.filter(function (r) { return r.status === "concluido"; }).length;
+      var pendentes = linhas.filter(function (r) { return r.status === "pendente"; }).length;
+      var temStatusReconhecido = linhas.some(function (r) { return !!STATUS[r.status] || r.status === "pendente"; });
+      var resumo = "Cronograma atualizado via PDF em " + br(dataAtual) + ": " + linhas.length + " item(ns), " + concluidas + " concluído(s), " + pendentes + " pendente(s).";
+      var mudouStatus = !!novoStatus && empresa.status !== novoStatus;
+      var mudouProgresso = novoProgresso != null && empresa.progresso !== novoProgresso;
+      if (novoStatus) empresa.status = novoStatus;
+      if (novoProgresso != null) empresa.progresso = novoProgresso;
+      if (novoStatus || novoProgresso != null || temStatusReconhecido) empresa.statusText = resumo;
+      empresa.atualizado = dataAtual;
+      empresa.historico = empresa.historico || [];
+      empresa.historico.unshift({
+        data: dataAtual,
+        progresso: empresa.progresso,
+        status: empresa.status,
+        texto: (mudouStatus || mudouProgresso ? "Atualizado via cronograma: " : "Cronograma importado: ") +
+          linhas.length + " item(ns), " + concluidas + " concluído(s)."
+      });
+      empresa.historico = empresa.historico.slice(0, 30);
+      tocados[empresa.id] = true;
+      atualizadas++;
+      if (novoStatus || novoProgresso != null || temStatusReconhecido) dadosStatusDetectados++;
+    });
+    db.data = dataAtual;
+    if (!salvar()) return;
+    fecharImportadorCronograma();
+    renderTudo();
+    toast(atualizadas + " empresa(s) atualizada(s) pelo cronograma" + (dadosStatusDetectados ? " · status/progresso conferidos" : " · o PDF não trouxe status reconhecível"));
+  }
+
+  $("#btnScheduleImport").onclick = abrirImportadorCronograma;
+  $("#mImportSchedule").onclick = function () { $("#menu").classList.remove("open"); abrirImportadorCronograma(); };
+  $("#closeSchedule").onclick = fecharImportadorCronograma;
+  $("#cancelSchedule").onclick = fecharImportadorCronograma;
+  $("#scheduleBackdrop").onclick = function (e) { if (e.target === this) fecharImportadorCronograma(); };
+  $("#scheduleChooseFile").onclick = function () { $("#scheduleFileInput").click(); };
+  $("#scheduleFileInput").onchange = function () {
+    var arquivo = this.files && this.files[0];
+    this.value = "";
+    processarPdfCronograma(arquivo);
+  };
+  $("#scheduleAddRow").onclick = adicionarLinhaCronogramaManual;
+  $("#scheduleApply").onclick = aplicarCronogramaPdf;
+  $("#schedulePreview").onchange = function (ev) {
+    var linha = ev.target.closest("tr[data-pdf-row]");
+    if (!linha) return;
+    var idx = num(linha.dataset.pdfRow, -1), item = pdfImport.linhas[idx];
+    if (!item) return;
+    var campo = ev.target.dataset.field;
+    if (campo === "usar") item.usar = ev.target.checked;
+    else if (campo === "progresso") item.progresso = ev.target.value === "" ? null : clamp(num(ev.target.value, 0), 0, 100);
+    else item[campo] = ev.target.value;
+    if (campo === "empresaId") {
+      var empresa = porId(item.empresaId);
+      item.empresaNome = empresa ? empresa.nome : "";
+      if (empresa) item.usar = true;
+    }
+    if (campo === "empresaId" || campo === "usar") {
+      var check = $("input[data-field=usar]", linha);
+      if (check) check.checked = item.usar;
+    }
+    atualizarResumoCronograma();
+  };
+  $("#schedulePreview").oninput = function (ev) {
+    var linha = ev.target.closest("tr[data-pdf-row]");
+    if (!linha || ev.target.dataset.field !== "atividade") return;
+    var item = pdfImport.linhas[num(linha.dataset.pdfRow, -1)];
+    if (item) item.atividade = ev.target.value;
+  };
+  var scheduleDrop = $("#scheduleDrop");
+  scheduleDrop.addEventListener("dragover", function (e) { e.preventDefault(); scheduleDrop.classList.add("drag"); });
+  scheduleDrop.addEventListener("dragleave", function () { scheduleDrop.classList.remove("drag"); });
+  scheduleDrop.addEventListener("drop", function (e) {
+    e.preventDefault(); scheduleDrop.classList.remove("drag");
+    var arquivo = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (arquivo) processarPdfCronograma(arquivo);
+  });
 
   $("#mReset").onclick = function () {
     var b = baseline();
@@ -729,7 +1170,8 @@
     var digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "");
     if (e.key === "/" && !digitando) { e.preventDefault(); $("#q").focus(); return; }
     if (e.key === "Escape") {
-      if ($("#syncBackdrop").classList.contains("on")) fecharSync();
+      if ($("#scheduleBackdrop").classList.contains("on")) fecharImportadorCronograma();
+      else if ($("#syncBackdrop").classList.contains("on")) fecharSync();
       else if ($("#editorBackdrop").classList.contains("on")) fecharEditor();
       else if ($("#backdrop").classList.contains("on")) fecharDetalhe();
       else if (document.body.classList.contains("focus")) document.body.classList.remove("focus");
