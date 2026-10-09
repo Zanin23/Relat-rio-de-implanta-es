@@ -17,6 +17,7 @@ index.html          -> o dashboard inteiro (HTML + CSS)
 dados.js            -> os dados do relatório (o baseline que volta no "Restaurar")
 app.js              -> toda a lógica: filtros, editor, salvamento, export/import e relatórios
 cronograma-pdf.js   -> leitura local do PDF e interpretação das linhas do cronograma
+importar-csv.js     -> leitura local de CSV (cronograma/agenda ou carteira de empresas)
 sync.js             -> sincronização compartilhada (merge, diff, tempo real)
 sync-config.js      -> URL + anon key do Supabase  (é isto que vale para todos)
 supabase.sql        -> roda uma vez no SQL Editor do Supabase
@@ -61,37 +62,97 @@ assim dá para ver a evolução da carteira.
 > Atalhos: clique no card abre o detalhe · `Enter` abre · `E` edita ·
 > `/` foca a busca · `Esc` fecha · `← →` navegam entre empresas.
 
-### Importar cronograma PDF
+### Importar cronograma (PDF) ou planilha (CSV)
 
-Use **Importar cronograma** no topo (ou **Dados ▾ → Importar cronograma PDF**):
+Use **⬆ Importar PDF/CSV** no topo (ou **Dados ▾ → Importar cronograma ou CSV**):
 
-1. Selecione/arraste o PDF. A leitura é feita **localmente no navegador**; o
-   arquivo não é enviado ao Supabase nem a outro servidor.
-2. Confira e edite a prévia: empresa, fase, atividade, datas prevista/visita/
-   conclusão, hora, responsável, tipo, status e progresso. As linhas não
-   reconhecidas podem ser ajustadas, associadas manualmente a uma empresa,
-   desmarcadas ou adicionadas manualmente.
-3. Clique **Aplicar atualizações**. Para cada empresa selecionada, os itens do
-   cronograma importado substituem o cronograma anterior daquela empresa. O
-   status `PENDENTE` é tratado como **Em andamento**; todas as etapas concluídas
-   marcam a empresa como **Concluído**. O progresso só muda quando o PDF contém
-   percentuais. As mudanças entram no histórico e, se a empresa estiver
-   sincronizada, são enviadas à equipe.
+1. Selecione/arraste o arquivo — **PDF** de cronograma ou **CSV/TSV** de
+   planilha. A leitura é feita **localmente no navegador**; o arquivo não é
+   enviado ao Supabase nem a outro servidor.
+2. Confira e edite a prévia. As linhas não reconhecidas podem ser ajustadas,
+   associadas manualmente a uma empresa, desmarcadas ou adicionadas à mão.
+3. Clique **Aplicar**. As mudanças entram no histórico de cada empresa e, se o
+   servidor estiver ligado, são enviadas à equipe.
+
+#### PDF
 
 A leitura reconhece PDFs que contêm texto pesquisável. O modelo analisado
 organiza as etapas em fases numeradas e mostra `CONCLUÍDO`/`PENDENTE`, além de
 `Previsto`, `Visita agendada`, `Concluído` e `Resp.`. Esses campos são associados
 à atividade logo acima; visitas e datas de conclusão também aparecem nos
 relatórios. Se o arquivo for uma imagem digitalizada, aplique OCR antes de
-importá-lo. Outros formatos podem exigir ajustes; revise sempre a prévia antes
-de confirmar.
+importá-lo.
+
+#### CSV
+
+O app detecta sozinho o **separador** (`;`, `,`, tabulação ou `|`), a
+codificação (UTF-8 com ou sem BOM e Windows-1252/ANSI do Excel), campos entre
+aspas com vírgulas e quebras de linha dentro — e, pelo **cabeçalho**, decide se
+a planilha é um cronograma ou uma carteira de empresas. Dá para trocar essa
+escolha no seletor **“Importar este CSV como”** dentro do modal. Os CSVs que o
+próprio relatório exporta (carteira, pendências e agenda/visitas) voltam a
+entrar sem ajuste nenhum, e o modal tem links para baixar
+`modelo-cronograma.csv` e `modelo-empresas.csv` já no formato certo.
+
+**1. Cronograma / agenda — cada linha é um item**
+
+| Coluna | Também aceita | Vira |
+| --- | --- | --- |
+| `Empresa` | Cliente, Razão social | empresa do item (casa pelo nome; sem correspondência, oferece **criar**) |
+| `Atividade` | Item, Tarefa, Descrição | texto do item |
+| `Fase` | Módulo, Bloco | fase (se vier em branco, repete a última preenchida) |
+| `Previsto` | Data, Prazo, Data prevista | data prevista |
+| `Visita agendada` | Visita, Data da visita | data da visita |
+| `Concluído em` | Conclusão, Término | data de conclusão (preenchida, já marca o item como concluído) |
+| `Hora` | Horário | hora (`14:00` ou `14h30`) |
+| `Responsável` | Resp., Consultor, Analista | responsável |
+| `Tipo` | Categoria | Etapa ou Visita |
+| `Status` | Situação, Estado | Pendente, Em andamento, Aguardando cliente/desenvolvimento, Atenção/risco, Concluído |
+| `Progresso` | %, Percentual | 0 a 100 (`40%`, `40` ou `0,4`) |
+
+Como no PDF: os itens **substituem** o cronograma anterior daquela empresa,
+`PENDENTE` vira **Em andamento**, todas as etapas concluídas marcam a empresa
+como **Concluído** e o progresso só muda quando a planilha traz percentuais.
+
+**2. Carteira de empresas — cada linha é uma empresa**
+
+| Coluna | Também aceita | Vira |
+| --- | --- | --- |
+| `Empresa` | Cliente, Razão social | a empresa (existente → atualiza; nova → cadastra) |
+| `Tipo` | Tipo de trabalho, Modalidade | tipo |
+| `Status` | Situação | status da empresa |
+| `Progresso` | %, Percentual | progresso |
+| `Status atual` | Resumo, Situação atual | frase do status |
+| `O que já foi feito` | Feito, Realizado | lista (itens separados por `\|`, `;` ou quebra de linha) |
+| `O que ainda falta fazer` | Falta, Pendências | lista |
+| `Outras empresas do grupo` | Grupo, Filiais | lista |
+| `Observação` | Obs, Nota interna | observação interna |
+| `Atualizado em` | Atualização | data da atualização |
+
+Regras: **célula em branco não apaga nada** do que já está no relatório; as
+listas podem **acrescentar só os itens novos** (padrão) ou **substituir** as
+existentes — a escolha fica em um seletor acima da prévia. Linhas cuja empresa
+não existe aparecem como *“+ criar nova empresa”* e podem ser redirecionadas
+para uma empresa já cadastrada no próprio seletor da prévia.
+
+Se o arquivo não tiver cabeçalho reconhecível, nada se perde: no modo
+cronograma cada linha passa pelo mesmo interpretador do PDF (empresa, datas e
+status detectados pelo conteúdo) e no modo carteira a primeira coluna vira o
+nome da empresa, com as demais deduzidas pelo que contêm. O aviso no topo do
+modal sempre diz o que foi reconhecido, e o bloco *“Ver as colunas
+reconhecidas”* mostra coluna por coluna.
+
+> Dica: no Excel, **Salvar como → CSV UTF-8 (delimitado por vírgulas)**; no
+> Google Planilhas, **Arquivo → Fazer o download → .csv**. Os dois funcionam.
 
 ### Relatórios complementares
 
 A seção **Relatórios complementares** apresenta a distribuição da carteira por
 faixa de progresso, as empresas com mais pendências e os próximos itens/prazos
 (avisando quando estiverem vencidos). Ela também oferece exportação CSV da
-carteira, das pendências e da agenda/visitas para abrir no Excel ou similar.
+carteira, das pendências e da agenda/visitas para abrir no Excel ou similar —
+e esses mesmos arquivos podem ser editados e **reimportados** pelo importador
+de CSV.
 
 ## Onde os dados ficam salvos
 
@@ -171,7 +232,10 @@ para conhecer o comportamento antes de ligar o Supabase de verdade — e só age
 
 - **Exportar JSON** — backup completo (para levar o relatório para outra máquina)
 - **Importar JSON** — substitui o relatório atual pelo de um arquivo
-  (com o servidor ligado, isso publica para a equipe; confirme antes)
+  (com o servidor ligado, isso publica para a equipe; confirme antes). Se você
+  escolher um `.csv` aqui, o importador de planilhas abre no lugar
+- **Importar cronograma ou CSV** — PDF do cronograma, agenda em CSV ou carteira
+  de empresas em CSV (veja acima)
 - **Baixar dados.js** — alternativa manual ao servidor: gera o arquivo para
   commitar no repositório. Útil se você preferir continuar no fluxo antigo
 - **Servidor compartilhado** — estado, chaves, "buscar agora", "publicar este
@@ -201,12 +265,12 @@ Cada empresa em `dados.js` (e cada linha `dados` do banco):
   fases: [["done",""],["done",""],["pend",""],["now",""],["na",""]],
   observacao: "Nota interna",   // opcional
   atualizado: "2026-10-08",
-  cronograma: [{               // opcional: preenchido pela importação de PDF
+  cronograma: [{               // opcional: preenchido pela importação de PDF/CSV
     fase: "Estoque", atividade: "Inventário",
     data: "2026-10-12", visitaData: "2026-10-13", concluidoEm: "",
     responsavel: "Matheus Zanin", hora: "14:00",
     categoria: "etapa", status: "pendente", progresso: null, origem: "cronograma.pdf"
-  }]
+  }]                           // origem = nome do arquivo (PDF ou CSV) que gerou o item
 }
 ```
 

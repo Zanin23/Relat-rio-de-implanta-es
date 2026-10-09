@@ -307,11 +307,20 @@ details.phases summary:hover{color:var(--txt)}
 .prow span{font-size:12.5px;color:var(--muted)}
 .prow select,.prow input{padding:6px 8px;font-size:12.5px}
 
-/* ---------- importação de cronograma PDF ---------- */
+/* ---------- importação de cronograma (PDF / CSV) ---------- */
 .upload-drop{display:flex;align-items:center;justify-content:space-between;gap:14px;border:1.5px dashed var(--line2);border-radius:11px;padding:17px;background:var(--surface2);transition:.14s}
 .upload-drop.drag{border-color:var(--accent);background:var(--accent-soft)}
 .upload-drop b{display:block;font-size:13px}
 .upload-drop .hint{margin-top:3px}
+.linkish{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer;text-decoration:underline}
+.linkish:hover{opacity:.8}
+.import-mode{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.import-mode label{font-size:12.5px;color:var(--muted);font-weight:600}
+.import-mode select{width:auto;min-width:260px;padding:6px 9px;font-size:12.5px}
+.import-mode .hint{margin:0;flex:1 1 220px}
+.import-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:4px 0 8px}
+.import-actions label{font-size:12.5px;color:var(--muted)}
+.import-actions select{width:auto;padding:6px 9px;font-size:12.5px}
 .import-state{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);font-size:12.5px;color:var(--muted)}
 .import-state.err{border-color:color-mix(in srgb,var(--risk) 35%,var(--line));color:var(--risk)}
 .import-state.ok{border-color:color-mix(in srgb,var(--ok) 32%,var(--line));color:var(--ok)}
@@ -402,7 +411,7 @@ body.focus .stage{display:block}
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
         <input type="text" id="q" placeholder="Buscar empresa, item, pendência…">
       </div>
-      <button class="btn" id="btnScheduleImport" title="Ler um PDF de cronograma e atualizar o relatório">⬆ Importar cronograma</button>
+      <button class="btn" id="btnScheduleImport" title="Importar um cronograma em PDF ou uma planilha CSV (cronograma ou carteira de empresas)">⬆ Importar PDF/CSV</button>
       <button class="btn primary" id="btnNew">+ Nova empresa</button>
       <button class="sync off" id="syncPill" type="button" title="Sincronização com a equipe"><span class="pt"></span><span class="tx">—</span></button>
       <div class="menu" id="menu">
@@ -410,8 +419,8 @@ body.focus .stage{display:block}
         <div class="menu-pop" id="menuPop">
           <button id="mExport"><span>⬇︎ Exportar JSON<small>backup com tudo o que está cadastrado</small></span></button>
           <button id="mExportJs"><span>⬇︎ Baixar dados.js<small>gera o arquivo para commitar (alternativa ao servidor)</small></span></button>
-          <button id="mImport"><span>⬆︎ Importar JSON<small>substitui o relatório atual</small></span></button>
-          <button id="mImportSchedule"><span>▣ Importar cronograma PDF<small>atualiza status, prazos e visitas</small></span></button>
+          <button id="mImport"><span>⬆︎ Importar JSON<small>substitui o relatório atual (CSV abre o importador)</small></span></button>
+          <button id="mImportSchedule"><span>▣ Importar cronograma ou CSV<small>PDF, agenda em CSV ou carteira de empresas</small></span></button>
           <hr>
           <button id="mSync"><span>☁ Servidor compartilhado<small>status, conexão e tempo real</small></span></button>
           <button id="mPull"><span>↻ Buscar alterações da equipe<small>traz o que estiver no servidor agora</small></span></button>
@@ -591,22 +600,31 @@ body.focus .stage{display:block}
   </div>
 </div>
 
-<!-- ==================== MODAL IMPORTAR CRONOGRAMA PDF ==================== -->
+<!-- ============= MODAL IMPORTAR CRONOGRAMA (PDF) OU PLANILHA (CSV) ============= -->
 <div class="backdrop" id="scheduleBackdrop">
   <div class="modal" id="scheduleModal" style="max-width:1100px">
     <button class="x" id="closeSchedule" title="Fechar">×</button>
     <div class="body">
-      <h2>Atualizar pelo cronograma</h2>
-      <p class="subline">O PDF é lido neste navegador. No modelo enviado, o leitor reconhece as fases numeradas, CONCLUÍDO/PENDENTE e Previsto, Visita agendada, Concluído e Responsável. Confira a prévia antes de aplicar.</p>
+      <h2>Importar cronograma ou planilha</h2>
+      <p class="subline">O arquivo é lido neste navegador, sem subir para lugar nenhum. No PDF, o leitor reconhece as fases numeradas, CONCLUÍDO/PENDENTE, Previsto, Visita agendada, Concluído e Responsável. No CSV, as colunas são reconhecidas pelo cabeçalho e o app identifica sozinho se cada linha é um item de cronograma ou uma empresa da carteira. Confira a prévia antes de aplicar.</p>
       <div class="upload-drop" id="scheduleDrop" style="margin-top:16px">
         <div>
-          <b>Selecione ou arraste um cronograma em PDF</b>
-          <p class="hint">PDFs com texto são reconhecidos. Arquivos digitalizados como imagem precisam de OCR antes da importação.</p>
+          <b>Selecione ou arraste um cronograma em PDF ou uma planilha CSV</b>
+          <p class="hint">CSV/TSV com cabeçalho, separado por <b>;</b> <b>,</b> ou tabulação (Excel, Google Planilhas e os próprios CSVs exportados neste relatório). PDFs precisam ter texto pesquisável — digitalizações exigem OCR.</p>
+          <p class="hint">Modelos de planilha: <button type="button" class="linkish" id="scheduleModelSchedule">cronograma.csv</button> · <button type="button" class="linkish" id="scheduleModelCompanies">empresas.csv</button></p>
         </div>
-        <button class="btn primary" type="button" id="scheduleChooseFile">Escolher PDF</button>
+        <button class="btn primary" type="button" id="scheduleChooseFile">Escolher arquivo</button>
       </div>
-      <input type="file" id="scheduleFileInput" accept="application/pdf,.pdf" hidden>
-      <div class="import-state" id="scheduleImportState" role="status" aria-live="polite">Nenhum arquivo selecionado. O relatório não será alterado até você clicar em “Aplicar atualizações”.</div>
+      <input type="file" id="scheduleFileInput" accept="application/pdf,.pdf,text/csv,.csv,.tsv,.txt" hidden>
+      <div class="import-state" id="scheduleImportState" role="status" aria-live="polite">Nenhum arquivo selecionado. O relatório não será alterado até você clicar em “Aplicar”.</div>
+      <div class="import-mode" id="importModeWrap" style="display:none">
+        <label for="importMode">Importar este CSV como</label>
+        <select id="importMode">
+          <option value="cronograma">Cronograma / agenda — cada linha é um item</option>
+          <option value="empresas">Carteira — cada linha é uma empresa</option>
+        </select>
+        <span class="hint" id="importModeHint"></span>
+      </div>
       <div id="schedulePreviewArea" style="display:none">
         <div class="import-summary" id="scheduleSummary"></div>
         <div style="display:flex;justify-content:flex-end;margin:4px 0 8px">
@@ -619,8 +637,28 @@ body.focus .stage{display:block}
           </table>
         </div>
         <details class="pdf-raw">
-          <summary>Ver texto extraído do PDF (para conferir a leitura)</summary>
+          <summary id="scheduleRawLabel">Ver texto extraído do PDF (para conferir a leitura)</summary>
           <pre id="scheduleRawText"></pre>
+        </details>
+      </div>
+      <div id="companyPreviewArea" style="display:none">
+        <div class="import-summary" id="companySummary"></div>
+        <div class="import-actions">
+          <label for="companyListMode">Em empresas já cadastradas, as listas de feito/falta devem</label>
+          <select id="companyListMode">
+            <option value="acrescentar">Acrescentar só os itens novos</option>
+            <option value="substituir">Substituir pelo que vier no CSV</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="preview">
+            <thead><tr><th>Destino</th><th>Empresa</th><th>Tipo</th><th>Status</th><th>%</th><th>Status atual</th><th>O que já foi feito</th><th>O que ainda falta</th><th>Atualizado</th><th title="Incluir na importação">Usar</th></tr></thead>
+            <tbody id="companyPreview"></tbody>
+          </table>
+        </div>
+        <details class="pdf-raw">
+          <summary>Ver as colunas reconhecidas no CSV</summary>
+          <pre id="companyRawText"></pre>
         </details>
       </div>
     </div>
@@ -664,7 +702,7 @@ body.focus .stage{display:block}
   </div>
 </div>
 
-<input type="file" id="fileInput" accept=".json,.js,.txt" style="display:none">
+<input type="file" id="fileInput" accept=".json,.js,.txt,.csv,.tsv" style="display:none">
 <div id="toast"></div>
 
 <script src="dados.js"></script>
@@ -673,6 +711,7 @@ body.focus .stage{display:block}
 <script src="mock-supabase.js"></script>
 <script src="sync.js"></script>
 <script src="cronograma-pdf.js"></script>
+<script src="importar-csv.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
