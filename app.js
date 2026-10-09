@@ -2,9 +2,10 @@
    RELATÓRIO DE IMPLANTAÇÕES — aplicação
    ---------------------------------------------------------------------
    · Lê o baseline de dados.js (window.DADOS_INICIAIS)
-   · Guarda as alterações no navegador (localStorage) -> "dar continuidade"
+   · Guarda as alterações no navegador (localStorage) -> cache, abre na hora
+   · Sincroniza com o Supabase via sync.js -> o que um altera vale para todos
    · Permite cadastrar novas empresas e atualizar as existentes
-   · Exporta/importa JSON e gera o dados.js para commitar no Git
+   · Exporta/importa JSON (backup) e gera o dados.js para commitar no Git
    ===================================================================== */
 (function () {
   "use strict";
@@ -12,6 +13,24 @@
   /* ================= CONSTANTES ================= */
   var LS_KEY = "relatorio-implantacoes.v1";
   var LS_TEMA = "relatorio-implantacoes.tema";
+
+  // se o sync.js não estiver carregado (site antigo, cache), o app segue local
+  var sync = window.SYNC || {
+    iniciar: function () { return Promise.resolve(false); },
+    ativo: function () { return false; },
+    aoVivo: function () { return false; },
+    alterou: function () {},
+    estado: function () {
+      return { modo: "off", msg: "sync.js não carregou", pendente: false, ultimaSync: 0, linhas: 0, config: { url: "", anonKey: "", table: "documentos" } };
+    },
+    config: function () { return { url: "", anonKey: "", table: "documentos", completo: false }; },
+    sincronizarAgora: function () { return Promise.resolve(false); },
+    reconectar: function () { return Promise.resolve(false); },
+    forcarPublicacao: function () { return Promise.resolve(false); },
+    esquecerConfig: function () { return {}; },
+    textoDoArquivoConfig: function () { return ""; },
+    substituirTudo: function () { return Promise.resolve(false); }
+  };
 
   var STATUS = {
     cliente:        { label: "Aguardando cliente",        color: "var(--wait)" },
@@ -29,6 +48,7 @@
 
   /* ================= ESTADO ================= */
   var db = { data: "", empresas: [] };          // dados ativos
+  var tocados = {};                             // ids editados NESTA sessão (desempate de conflito)
   var editando = null;                          // id da empresa em edição
   var ui = { status: "all", type: "all", q: "", sort: "origem", aberto: null, present: 0 };
 
@@ -53,6 +73,23 @@
   function num(v, padrao) { var n = parseInt(v, 10); return isNaN(n) ? (padrao || 0) : n; }
   function id() { return "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+  // id estável a partir do nome: sem ele, dois navegadores que partiram do
+  // mesmo dados.js criariam ids diferentes para a mesma empresa na hora de
+  // publicar no servidor (e a empresa apareceria duplicada)
+  function chaveNome(v) {
+    var s = String(v == null ? "" : v).toLowerCase();
+    try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch (e) {}
+    s = s.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    return s.slice(0, 28);
+  }
+  function idDeNome(nome) {
+    var k = chaveNome(nome) || "empresa";
+    var cruza = String(nome || "").trim().toLowerCase();
+    var hsh = 5381;
+    for (var i = 0; i < cruza.length; i++) hsh = ((hsh << 5) + hsh + cruza.charCodeAt(i)) >>> 0;
+    return "n" + k + "-" + hsh.toString(36);
+  }
+
   function toast(msg) {
     var t = $("#toast");
     t.textContent = msg;
@@ -64,7 +101,7 @@
   /* ================= PERSISTÊNCIA ================= */
   function normalizar(e) {
     return {
-      id: e.id || id(),
+      id: e.id || (e.nome ? idDeNome(e.nome) : id()),
       nome: String(e.nome || e.name || "Sem nome").trim(),
       tipo: String(e.tipo || e.type || "Outro").trim(),
       status: STATUS[e.status] ? e.status : "andamento",
@@ -112,6 +149,15 @@
     };
   }
 
+  var baseArquivo = null;
+  function baselineComparavel() {
+    if (baseArquivo) return baseArquivo;
+    var b = baseline(), porNome = {};
+    b.empresas.forEach(function (e) { var k = chaveNome(e.nome); if (k) porNome[k] = e; });
+    baseArquivo = { porNome: porNome, data: b.data };
+    return baseArquivo;
+  }
+
   function carregar() {
     try {
       var raw = localStorage.getItem(LS_KEY);
@@ -126,9 +172,16 @@
   }
 
   function salvar() {
+    if (!gravarCache()) return false;
+    sync.alterou();          // avisa o sync.js: tem coisa nova para subir
+    renderFooter();
+    return true;
+  }
+
+  // grava a cache do navegador sem pedir o envio (usada quando a mudança veio do servidor)
+  function gravarCache() {
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(db));
-      renderFooter();
       return true;
     } catch (err) {
       toast("Não foi possível salvar neste navegador (armazenamento cheio).");
@@ -328,13 +381,40 @@
     });
   }
 
+  function capital(t) { return String(t || "").charAt(0).toUpperCase() + String(t || "").slice(1); }
+
+  function hora(ts) {
+    if (!ts) return "—";
+    var d = new Date(ts);
+    return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  }
+
+  // o estado da sincronização aparece no rodapé e na pílula do topo
+  function estadoSync() {
+    var s = sync.estado();
+    if (s.modo === "conectando") return { cls: "wait", txt: "conectando ao servidor…" };
+    if (s.modo === "erro") return { cls: "err", txt: "sem conexão com o servidor · guardado neste navegador · " + (s.msg || "") };
+    if (s.modo === "ao-vivo" && s.pendente) return { cls: "wait", txt: "enviando para a equipe…" };
+    if (s.modo === "ao-vivo") return { cls: "on", txt: "ao vivo com a equipe · " + s.linhas + " empresas · último sync " + hora(s.ultimaSync) };
+    return { cls: "off", txt: "salvo só neste navegador — clique para compartilhar com a equipe" };
+  }
+
   function renderFooter() {
-    var local = (function () { try { return !!localStorage.getItem(LS_KEY); } catch (e) { return false; } })();
+    var es = estadoSync();
+    var pill = $("#syncPill");
+    if (pill) {
+      pill.className = "sync " + es.cls;
+      pill.innerHTML = '<span class="pt"></span><span class="tx">' + esc(es.txt) + "</span>";
+      pill.title = "Sincronização compartilhada — clique para configurar";
+    }
     $("#footer").innerHTML = "<span>Levantamento de " + br(db.data) + "</span><span>·</span>" +
       "<span>" + db.empresas.length + " empresas</span><span>·</span>" +
       "<span>" + totalFeito() + " itens concluídos</span><span>·</span>" +
       "<span>" + totalFalta() + " pendências</span>" +
-      (local ? '<span class="save">· alterações salvas neste navegador</span>' : "");
+      '<span class="' + (es.cls === "on" ? "save" : "sinc " + es.cls) + '">· ' + esc(es.txt) + "</span>" +
+      (es.cls === "off" ? '<button class="linklike" id="footerSync">configurar</button>' : "");
+    var fs = $("#footerSync");
+    if (fs) fs.onclick = function () { abrirSync(); };
   }
 
   function renderTudo() {
@@ -432,9 +512,10 @@
     }).join("");
 
     $("#edTitle").textContent = e ? "Editar " + e.nome : "Nova empresa";
+    var destino = sync.ativo() ? "salvo e enviado para a equipe na hora" : "salvo automaticamente neste navegador";
     $("#edSub").textContent = e
-      ? "Atualize o status, o que foi feito e o que ainda falta. Salvo automaticamente neste navegador."
-      : "Cadastre a empresa e mantenha o status sempre atualizado.";
+      ? "Atualize o status, o que foi feito e o que ainda falta. " + capital(destino) + "."
+      : "Cadastre a empresa e mantenha o status sempre atualizado (" + destino + ").";
     $("#fNome").value = e ? e.nome : "";
     $("#fTipo").value = e ? e.tipo : "";
     $("#fStatus").value = e ? e.status : "andamento";
@@ -500,16 +581,17 @@
       reg.historico = reg.historico.slice(0, 30);
     }
 
+    tocados[reg.id] = true;
     if (antigo) {
       var i = db.empresas.indexOf(antigo);
       db.empresas[i] = reg;
-      toast(nome + " atualizada.");
     } else {
       db.empresas.push(reg);
       ui.sort = "origem";
-      toast(nome + " cadastrada no relatório.");
     }
     if (!salvar()) return;
+    toast(nome + (antigo ? " atualizada" : " cadastrada no relatório") +
+      (sync.ativo() ? " — salvando para a equipe…" : " — salva só neste navegador"));
     fecharEditor();
     renderTudo();
     if (ui.aberto) abrirDetalhe(reg.id);
@@ -586,13 +668,19 @@
   };
 
   $("#mReset").onclick = function () {
-    if (!window.confirm("Restaurar o relatório original (dados de " + br(baseline().data) + ")? As alterações salvas neste navegador serão descartadas.")) return;
+    var b = baseline();
+    var aoServidor = sync.ativo();
+    var aviso = aoServidor
+      ? "Restaurar o relatório original (dados de " + br(b.data) + ")?\n\nATENÇÃO: com o servidor compartilhado ligado, isso envia o baseline para o banco e vale para a EQUIPE INTEIRA — as alterações de todo mundo que não estejam no dados.js serão perdidas."
+      : "Restaurar o relatório original (dados de " + br(b.data) + ")? As alterações salvas neste navegador serão descartadas.";
+    if (!window.confirm(aviso)) return;
     try { localStorage.removeItem(LS_KEY); } catch (e) {}
-    db = baseline();
+    db = b;
     ui = { status: "all", type: "all", q: "", sort: "origem", aberto: null, present: 0 };
     $("#q").value = "";
-    fecharDetalhe(); fecharEditor(); renderTudo();
-    toast("Relatório original restaurado.");
+    fecharDetalhe(); fecharEditor();
+    var fim = function () { renderTudo(); toast("Relatório original restaurado."); };
+    if (aoServidor) sync.substituirTudo(db).then(fim); else fim();
   };
 
   /* ================= MENU / TEMA / TOPO ================= */
@@ -641,7 +729,8 @@
     var digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName || "");
     if (e.key === "/" && !digitando) { e.preventDefault(); $("#q").focus(); return; }
     if (e.key === "Escape") {
-      if ($("#editorBackdrop").classList.contains("on")) fecharEditor();
+      if ($("#syncBackdrop").classList.contains("on")) fecharSync();
+      else if ($("#editorBackdrop").classList.contains("on")) fecharEditor();
       else if ($("#backdrop").classList.contains("on")) fecharDetalhe();
       else if (document.body.classList.contains("focus")) document.body.classList.remove("focus");
       else $("#menu").classList.remove("open");
@@ -698,6 +787,137 @@
   }
   function sairPresent() { document.body.classList.remove("focus"); }
 
+  /* ================= SERVIDOR COMPARTILHADO: LIGAÇÃO + UI ================= */
+  function iniciarSync() {
+    return sync.iniciar({
+      getDb: function () { return db; },
+      setDb: function (novo) { db = novo; gravarCache(); renderTudo(); },
+      normalizar: normalizar,
+      hoje: hoje,
+      tocado: function (eid) { return !!tocados[eid]; },
+      baseline: baselineComparavel,
+      toast: toast,
+      salvarCache: gravarCache,
+      aoStatus: function () { renderFooter(); if ($("#syncBackdrop").classList.contains("on")) renderSync(); },
+      aoRemoto: function (ids) {
+        if (!ids.length) return;
+        if (ui.aberto && ids.indexOf(ui.aberto) >= 0) abrirDetalhe(ui.aberto);
+        if (editando && ids.indexOf(editando) >= 0) {
+          toast("Outra pessoa mexeu nesta empresa enquanto você editava — salvar sobrescreve.");
+          return;
+        }
+        toast(ids.length === 1 ? "Atualização da equipe aplicada." : ids.length + " atualizações da equipe aplicadas.");
+      },
+      aoPublicar: function () { tocados = {}; toast("Publicado para a equipe ☁"); }
+    }).then(function (ok) { renderFooter(); return ok; });
+  }
+
+  function abrirSync() { $("#syncBackdrop").classList.add("on"); preencherSync(); }
+  function fecharSync() { $("#syncBackdrop").classList.remove("on"); }
+
+  function preencherSync() {
+    var c = sync.config();
+    if ($("#syncUrl").value !== c.url) $("#syncUrl").value = c.url || "";
+    if ($("#syncKey").value !== c.anonKey) $("#syncKey").value = c.anonKey || "";
+    renderSync();
+  }
+
+  function renderSync() {
+    var s = sync.estado();
+    var cor = { "ao-vivo": "var(--ok)", conectando: "var(--wait)", erro: "var(--risk)" }[s.modo] || "var(--muted)";
+    var rot = {
+      "ao-vivo": s.pendente ? "conectado · enviando o que mudou…" : "conectado · tempo real ligado",
+      conectando: "conectando…",
+      erro: "erro de conexão",
+      local: "desligado — as alterações ficam só neste navegador",
+      off: "desligado"
+    }[s.modo] || s.modo;
+    var conf = s.config || {};
+
+    $("#syncStatus").innerHTML =
+      '<div style="display:flex;gap:10px;align-items:flex-start">' +
+        '<span style="width:9px;height:9px;border-radius:50%;background:' + cor + ';margin-top:5px;flex:none"></span>' +
+        '<div style="min-width:0"><b>' + esc(rot) + "</b>" +
+        (s.msg ? '<div style="color:var(--muted);font-size:12.5px;margin-top:3px;overflow-wrap:anywhere">' + esc(s.msg) + "</div>" : "") +
+        '<div style="color:var(--faint);font-size:12px;margin-top:6px">última sincronização ' + hora(s.ultimaSync) +
+        " · " + s.linhas + " empresa(s) no servidor · tabela <code>" + esc(conf.table || "documentos") + "</code></div>" +
+        '<div style="color:var(--faint);font-size:12px;margin-top:3px">URL do projeto: <code>' +
+          esc(conf.url || "—") + "</code> · chave: " + (conf.anonKey ? "definida (" + String(conf.anonKey).length + " caracteres)" : "não definida") +
+        "</div></div>" +
+      "</div>";
+
+    var acoes = "";
+    if (s.modo === "ao-vivo") {
+      acoes = '<button class="btn sm" data-acao="puxar">↻ Buscar alterações agora</button>' +
+        '<button class="btn sm" data-acao="forcar">Publicar este navegador inteiro</button>' +
+        '<button class="btn sm" data-acao="reset">Zerar o banco e recriar do zero</button>';
+    }
+    $("#syncAcoes").innerHTML = acoes;
+    $$("#syncAcoes [data-acao]").forEach(function (b) {
+      b.onclick = function () { acaoSync(b.dataset.acao); };
+    });
+
+    $("#syncBaixar").style.display = conf.url && conf.anonKey ? "" : "none";
+
+    $("#syncPassos").innerHTML = s.modo === "ao-vivo" ? "" :
+      '<h4 style="margin:14px 0 0;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:650">Ligar em 4 passos</h4>' +
+      '<ol class="passos">' +
+        "<li><b>Criar o projeto</b> — em <code>supabase.com</code>: <i>New project</i>, região South America (São Paulo). É gratuito e leva 1 minuto.</li>" +
+        "<li><b>Rodar o SQL</b> — <i>SQL Editor → New query</i>, cole o conteúdo de <code>supabase.sql</code> deste repositório e clique <i>Run</i>. Cria a tabela <code>documentos</code>, libera acesso para quem tem o link e liga o tempo real.</li>" +
+        "<li><b>Copiar as chaves</b> — <i>Project Settings → API</i>: <code>Project URL</code> e <code>anon public key</code>. Cole nos campos acima e clique <b>Testar e conectar</b> para ver funcionando já neste navegador.</li>" +
+        "<li><b>Valer para todos</b> — clique <b>Baixar sync-config.js pronto</b>, substitua o arquivo no repositório e faça commit. A Vercel republica e o mesmo link passa a ser compartilhado pela equipe.</li>" +
+      "</ol>";
+  }
+
+  function acaoSync(qual) {
+    if (qual === "puxar") { sync.sincronizarAgora().then(function () { toast("Procurado no servidor."); }); }
+    if (qual === "forcar") {
+      if (!window.confirm("Enviar as " + db.empresas.length + " empresas deste navegador para o servidor (sem apagar as que só existem lá)?")) return;
+      sync.forcarPublicacao().then(function (ok) { toast(ok ? "Enviado para a equipe." : "Não consegui enviar — veja o estado acima."); });
+    }
+    if (qual === "reset") {
+      if (!window.confirm("Apagar TODAS as linhas do servidor e publicar o relatório deste navegador no lugar? Isso vale para a equipe inteira.")) return;
+      sync.substituirTudo(db).then(function (ok) { toast(ok ? "Servidor recriado a partir deste navegador." : "Não consegui recriar."); });
+    }
+  }
+
+  $("#syncPill").onclick = abrirSync;
+  $("#mSync").onclick = function () { $("#menu").classList.remove("open"); abrirSync(); };
+  $("#mPull").onclick = function () {
+    $("#menu").classList.remove("open");
+    if (!sync.ativo()) { abrirSync(); toast("Sem servidor configurado ainda."); return; }
+    sync.sincronizarAgora().then(function () { toast("Relatório comparado com o servidor."); });
+  };
+  $("#closeSync").onclick = fecharSync;
+  $("#syncFechar").onclick = fecharSync;
+  $("#syncBackdrop").onclick = function (e) { if (e.target === this) fecharSync(); };
+
+  $("#syncTestar").onclick = function () {
+    var u = $("#syncUrl").value.trim(), k = $("#syncKey").value.trim();
+    if (!u || !k) { toast("Cole a URL e a anon key do Supabase."); return; }
+    toast("Conectando…");
+    sync.reconectar(u, k).then(function (ok) {
+      renderTudo();
+      renderSync();
+      if (ok) toast("Conectado: o que você alterar vai para a equipe.");
+      else toast("Não conectou — " + (sync.estado().msg || "veja os passos abaixo"));
+    });
+  };
+
+  $("#syncBaixar").onclick = function () {
+    var u = $("#syncUrl").value.trim(), k = $("#syncKey").value.trim();
+    if (!u || !k) { toast("Cole a URL e a anon key primeiro."); return; }
+    baixar("sync-config.js", sync.textoDoArquivoConfig(u, k), "text/javascript;charset=utf-8");
+    toast("sync-config.js baixado — substitua o arquivo no repositório e faça commit.");
+  };
+
+  $("#syncEsquecer").onclick = function () {
+    sync.esquecerConfig();
+    preencherSync();
+    renderTudo();
+    toast("Chaves esquecidas neste navegador. O app volta a salvar só localmente.");
+  };
+
   /* ================= INIT ================= */
   (function init() {
     var t = "light";
@@ -705,5 +925,6 @@
     aplicarTema(t);
     db = carregar();
     renderTudo();
+    iniciarSync();
   })();
 })();

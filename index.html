@@ -187,6 +187,34 @@ html[data-theme="dark"] .chip.on{background:var(--txt);color:#0c0c0f}
 .empty button{margin-top:12px}
 .footer{color:var(--faint);font-size:11.5px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:30px}
 .footer .save{color:var(--ok)}
+.footer .sinc.on{color:var(--ok)}
+.footer .sinc.wait{color:var(--wait)}
+.footer .sinc.err{color:var(--risk)}
+.footer .sinc.off{color:var(--muted)}
+.linklike{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:11.5px;cursor:pointer;text-decoration:underline}
+
+/* ---------- pílula de sincronização (topo) ---------- */
+.sync{display:inline-flex;align-items:center;gap:7px;height:34px;padding:0 12px;font-size:12px;
+  border:1px solid var(--line);background:var(--surface);border-radius:99px;cursor:pointer;color:var(--muted);
+  white-space:nowrap;font-family:inherit}
+.sync:hover{border-color:var(--line2);color:var(--txt)}
+.sync .pt{width:7px;height:7px;border-radius:50%;background:var(--faint);flex:none}
+.sync.on{color:var(--ok)} .sync.on .pt{background:var(--ok)}
+.sync.wait{color:var(--wait)} .sync.wait .pt{background:var(--wait);animation:pulse 1.1s infinite}
+.sync.err{color:var(--risk)} .sync.err .pt{background:var(--risk);animation:pulse 1.1s infinite}
+.sync.off{color:var(--muted)}
+@keyframes pulse{50%{opacity:.2}}
+.passos{margin:0;padding:0;list-style:none;counter-reset:passo}
+.passos li{position:relative;padding:10px 0 10px 34px;border-bottom:1px solid var(--line);font-size:13px;color:var(--muted)}
+.passos li:last-child{border-bottom:0}
+.passos li::before{counter-increment:passo;content:counter(passo);position:absolute;left:0;top:9px;
+  width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.passos b{color:var(--txt);font-weight:600}
+.passos code{background:var(--surface2);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:12px;color:var(--txt)}
+.cod{display:block;white-space:pre;background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+  padding:11px 13px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--txt);
+  overflow:auto;margin:10px 0 0;max-height:220px}
 
 /* ============================================================
    MODAIS
@@ -321,12 +349,16 @@ body.focus .stage{display:block}
         <input type="text" id="q" placeholder="Buscar empresa, item, pendência…">
       </div>
       <button class="btn primary" id="btnNew">+ Nova empresa</button>
+      <button class="sync off" id="syncPill" type="button" title="Sincronização com a equipe"><span class="pt"></span><span class="tx">—</span></button>
       <div class="menu" id="menu">
         <button class="btn" id="btnMenu">Dados ▾</button>
         <div class="menu-pop" id="menuPop">
           <button id="mExport"><span>⬇︎ Exportar JSON<small>backup com tudo o que está cadastrado</small></span></button>
-          <button id="mExportJs"><span>⬇︎ Baixar dados.js<small>arquivo para commitar e publicar para todos</small></span></button>
+          <button id="mExportJs"><span>⬇︎ Baixar dados.js<small>gera o arquivo para commitar (alternativa ao servidor)</small></span></button>
           <button id="mImport"><span>⬆︎ Importar JSON<small>substitui o relatório atual</small></span></button>
+          <hr>
+          <button id="mSync"><span>☁ Servidor compartilhado<small>status, conexão e tempo real</small></span></button>
+          <button id="mPull"><span>↻ Buscar alterações da equipe<small>traz o que estiver no servidor agora</small></span></button>
           <hr>
           <button id="mReset"><span>↺ Restaurar relatório original<small>volta aos dados de 08/10/2026</small></span></button>
         </div>
@@ -471,10 +503,44 @@ body.focus .stage{display:block}
   </div>
 </div>
 
+<!-- ==================== MODAL SERVIDOR COMPARTILHADO ==================== -->
+<div class="backdrop" id="syncBackdrop">
+  <div class="modal" id="syncModal" style="max-width:660px">
+    <button class="x" id="closeSync" title="Fechar">×</button>
+    <div class="body">
+      <h2>Servidor compartilhado</h2>
+      <p class="subline">Desligado, cada pessoa edita uma cópia só dela. Ligado, o relatório é um só para a equipe inteira — e muda sozinho nas abas abertas.</p>
+      <div id="syncStatus" style="margin-top:16px;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:14px 15px;font-size:13px"></div>
+      <div id="syncAcoes" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px"></div>
+      <div style="margin-top:20px">
+        <label class="f" for="syncUrl">Project URL do Supabase</label>
+        <input type="text" id="syncUrl" placeholder="https://abcdefghijmnop.supabase.co" autocomplete="off" spellcheck="false">
+        <label class="f" for="syncKey" style="margin-top:12px">anon public key</label>
+        <input type="text" id="syncKey" placeholder="eyJhbGciOiJIUzI1NiIs..." autocomplete="off" spellcheck="false">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn sm primary" id="syncTestar">Testar e conectar neste navegador</button>
+        <button class="btn sm" id="syncBaixar">Baixar sync-config.js pronto</button>
+        <button class="btn sm danger" id="syncEsquecer">Esquecer chaves deste navegador</button>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:20px 0 2px">
+      <div id="syncPassos"></div>
+    </div>
+    <div class="foot">
+      <span class="hint">Colar as chaves aqui vale só para este navegador. Para valer para todos, baixe o arquivo <b>sync-config.js</b> e faça commit dele no repositório.</span>
+      <button class="btn sm" id="syncFechar" style="margin-left:auto">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <input type="file" id="fileInput" accept=".json,.js,.txt" style="display:none">
 <div id="toast"></div>
 
 <script src="dados.js"></script>
+<script src="vendor/supabase-2.117.3.umd.min.js"></script>
+<script src="sync-config.js"></script>
+<script src="mock-supabase.js"></script>
+<script src="sync.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
