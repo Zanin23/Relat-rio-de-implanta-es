@@ -5,8 +5,8 @@
    políticas RLS criadas em supabase.sql.
    ===================================================================== */
 window.SYNC_CONFIG = {
-  url: "https://dlnfuvhlkgnzesrnqgfd.supabase.co",
-  anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRsbmZ1dmhsa2duemVzcm5xZ2ZkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1NDQ4MjcsImV4cCI6MjEwNzEyMDgyN30.ew9xsAmQcBXtsPt93dz5yPY7AXtBT3WfM67WTaVjCzo",
+  url: "https://pnaupodddxrbqbjilhft.supabase.co",
+  anonKey: "sb_publishable_vz9REAkToghXmd1R0adsTw_J8PYkZmz",
   table: "documentos",
   schema: "public"
 };
