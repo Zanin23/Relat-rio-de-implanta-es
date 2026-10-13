@@ -1493,10 +1493,11 @@
   // o estado da sincronização aparece no rodapé e na pílula do topo
   function estadoSync() {
     var s = sync.estado();
-    if (s.modo === "conectando") return { cls: "wait", txt: "conectando ao servidor…" };
+    var aviso = (s.config && s.config.local) ? " ⚠ usando config de TESTE diferente da oficial" : "";
+    if (s.modo === "conectando") return { cls: "wait", txt: "conectando ao servidor…" + aviso };
     if (s.modo === "erro") return { cls: "err", txt: "sem conexão com o servidor · guardado neste navegador · " + (s.msg || "") };
-    if (s.modo === "ao-vivo" && s.pendente) return { cls: "wait", txt: "enviando para a equipe…" };
-    if (s.modo === "ao-vivo") return { cls: "on", txt: "ao vivo com a equipe · " + s.linhas + " empresas · último sync " + hora(s.ultimaSync) };
+    if (s.modo === "ao-vivo" && s.pendente) return { cls: "wait", txt: "enviando para a equipe…" + aviso };
+    if (s.modo === "ao-vivo") return { cls: aviso ? "wait" : "on", txt: "ao vivo com a equipe · " + s.linhas + " empresas · último sync " + hora(s.ultimaSync) + aviso };
     return { cls: "off", txt: "salvo só neste navegador — clique para compartilhar com a equipe" };
   }
 
@@ -2903,6 +2904,7 @@
       '<div style="display:flex;gap:10px;align-items:flex-start">' +
         '<span style="width:9px;height:9px;border-radius:50%;background:' + cor + ';margin-top:5px;flex:none"></span>' +
         '<div style="min-width:0"><b>' + esc(rot) + "</b>" +
+        (conf.local ? '<div style="color:var(--risk);font-size:12.5px;margin-top:3px;font-weight:650">⚠ Este navegador está usando uma conexão de TESTE, diferente do sync-config.js oficial do repositório. Clique em "Esquecer chaves deste navegador" para voltar ao banco oficial (o mesmo de todo mundo).</div>' : "") +
         (s.msg ? '<div style="color:var(--muted);font-size:12.5px;margin-top:3px;overflow-wrap:anywhere">' + esc(s.msg) + "</div>" : "") +
         '<div style="color:var(--faint);font-size:12px;margin-top:6px">última sincronização ' + hora(s.ultimaSync) +
         " · " + s.linhas + " empresa(s) no servidor · tabela <code>" + esc(conf.table || "documentos") + "</code></div>" +

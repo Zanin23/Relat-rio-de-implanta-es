@@ -146,25 +146,45 @@
   function avisar() { if (h && h.aoStatus) { try { h.aoStatus(); } catch (e) {} } }
   function dizer(msg) { if (h && h.toast) h.toast(msg); }
 
-  /* ================= CONFIG ================= */
+  /* ================= CONFIG =================
+     window.SYNC_CONFIG (sync-config.js, commitado) é sempre a fonte oficial.
+     Um navegador pode testar outra URL/chave colando no painel de sync, mas
+     isso fica guardado SÓ naquele navegador (LS_CONF) e carimbado com qual
+     era o oficial no momento do teste (baseUrl). Se o sync-config.js do
+     repositório mudar depois (ex.: corrigindo as chaves para todo mundo),
+     o carimbo não bate mais e o override velho é descartado sozinho — assim
+     nenhum navegador fica "preso" num banco antigo/errado para sempre. */
   function configEfetiva() {
     var base = window.SYNC_CONFIG || {};
+    var oficialUrl = String(base.url || "").trim().replace(/\/+$/, "");
     var out = {
       url: base.url || "",
       anonKey: base.anonKey || base.key || "",
       table: base.table || "documentos",
-      schema: base.schema || "public"
+      schema: base.schema || "public",
+      local: false          // true = este navegador está usando algo DIFERENTE do sync-config.js oficial
     };
     try {
       var ov = JSON.parse(localStorage.getItem(LS_CONF) || "null");
-      if (ov) { out.url = ov.url || out.url; out.anonKey = ov.key || ov.anonKey || out.anonKey; }
+      if (ov) {
+        if (ov.baseUrl && ov.baseUrl === oficialUrl) {
+          // o oficial não mudou desde que este navegador testou outra config: respeita o teste
+          out.url = ov.url || out.url;
+          out.anonKey = ov.key || ov.anonKey || out.anonKey;
+          out.local = true;
+        } else {
+          // override sem carimbo (versão antiga) OU o oficial mudou -> descarta e volta para o oficial
+          localStorage.removeItem(LS_CONF);
+          localStorage.removeItem(LS_BASE);
+        }
+      }
     } catch (e) {}
     try {
       var q = new URLSearchParams(location.search);
       var u = q.get("sburl") || q.get("supabase_url");
       var k = q.get("sbkey") || q.get("supabase_key");
-      if (u) out.url = u;
-      if (k) out.anonKey = k;
+      if (u) { out.url = u; out.local = true; }
+      if (k) { out.anonKey = k; out.local = true; }
     } catch (e) {}
     out.url = String(out.url).trim().replace(/\/+$/, "");
     out.anonKey = String(out.anonKey).trim();
@@ -611,10 +631,16 @@
     },
 
     // guardou as chaves no navegador: reconecta sem precisar de commit
+    // (fica marcado como teste "preso" ao sync-config.js oficial do momento: se o
+    //  oficial for corrigido/trocado depois, este navegador volta sozinho para ele)
     reconectar: function (url, key) {
       try {
-        if (url || key) localStorage.setItem(LS_CONF, JSON.stringify({ url: url || "", key: key || "" }));
-        else localStorage.removeItem(LS_CONF);
+        if (url || key) {
+          var oficial = String((window.SYNC_CONFIG || {}).url || "").trim().replace(/\/+$/, "");
+          localStorage.setItem(LS_CONF, JSON.stringify({ url: url || "", key: key || "", baseUrl: oficial }));
+        } else {
+          localStorage.removeItem(LS_CONF);
+        }
       } catch (e) {}
       sb = null; canal = null; tPoll = null;
       st.modo = "off"; st.base = null; st.enviadas = {};
